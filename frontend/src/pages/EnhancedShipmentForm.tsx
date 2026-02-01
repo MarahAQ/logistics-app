@@ -3,7 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ShipmentFormData } from '../types/shipment';
 import AutoSuggestInput from '../components/AutoSuggestInput';
 
-// ✅ 1. DEFINE initialFormData WITH ALL FIELDS
+// ============================================
+// INITIAL FORM DATA
+// ============================================
 const initialFormData: ShipmentFormData = {
   movement_date: '',
   movement_type: 'استيراد',
@@ -31,7 +33,6 @@ const initialFormData: ShipmentFormData = {
   warehouse_manager_phone: '',
   process_type: 'استيراد',
   notes: '',
-  // ✅ Phase 1: keep UI-only schedule (we serialize it into warehouse_working_hours)
   working_schedule: {
     type: 'preset',
     preset: 'sun-thu',
@@ -41,21 +42,159 @@ const initialFormData: ShipmentFormData = {
   },
 };
 
+// ============================================
+// SECTION CONFIGURATION
+// ============================================
+const SECTIONS = [
+  { id: 1, title: 'نوع العملية والتاريخ', icon: '📋', titleEn: 'Operation & Date' },
+  { id: 2, title: 'معلومات العميل', icon: '👤', titleEn: 'Client Info' },
+  { id: 3, title: 'معلومات الحاوية', icon: '📦', titleEn: 'Container Info' },
+  { id: 4, title: 'معلومات السائق والمركبة', icon: '🚛', titleEn: 'Driver & Vehicle' },
+  { id: 5, title: 'معلومات التسليم', icon: '📍', titleEn: 'Delivery Info' },
+  { id: 6, title: 'ملاحظات إضافية', icon: '📝', titleEn: 'Notes' },
+];
+
+// ============================================
+// PROGRESS INDICATOR COMPONENT
+// ============================================
+interface ProgressIndicatorProps {
+  currentSection: number;
+  completedSections: number[];
+}
+
+const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({ currentSection, completedSections }) => {
+  return (
+    <div className="mb-8">
+      {/* Progress Bar */}
+      <div className="flex items-center justify-between mb-4">
+        {SECTIONS.map((section, index) => (
+          <React.Fragment key={section.id}>
+            {/* Circle */}
+            <div className="flex flex-col items-center">
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold transition-all duration-300 ${
+                  completedSections.includes(section.id)
+                    ? 'bg-green-500 text-white'
+                    : currentSection === section.id
+                    ? 'bg-blue-500 text-white ring-4 ring-blue-200'
+                    : 'bg-gray-200 text-gray-500'
+                }`}
+              >
+                {completedSections.includes(section.id) ? '✓' : section.id}
+              </div>
+              <span className="text-xs mt-1 text-gray-600 hidden sm:block">{section.icon}</span>
+            </div>
+            {/* Connector Line */}
+            {index < SECTIONS.length - 1 && (
+              <div
+                className={`flex-1 h-1 mx-2 rounded transition-all duration-300 ${
+                  completedSections.includes(section.id) ? 'bg-green-500' : 'bg-gray-200'
+                }`}
+              />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+      {/* Progress Text */}
+      <div className="text-center text-sm text-gray-600">
+        <span className="font-medium">{completedSections.length}</span> من <span className="font-medium">{SECTIONS.length}</span> أقسام مكتملة
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// SECTION HEADER COMPONENT
+// ============================================
+interface SectionHeaderProps {
+  section: typeof SECTIONS[0];
+  isActive: boolean;
+  isCompleted: boolean;
+  isLocked: boolean;
+  onClick: () => void;
+  summary?: string;
+}
+
+const SectionHeader: React.FC<SectionHeaderProps> = ({
+  section,
+  isActive,
+  isCompleted,
+  isLocked,
+  onClick,
+  summary,
+}) => {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={isLocked}
+      className={`w-full p-4 rounded-lg border-2 transition-all duration-300 text-right ${
+        isActive
+          ? 'border-blue-500 bg-blue-50'
+          : isCompleted
+          ? 'border-green-500 bg-green-50 hover:bg-green-100'
+          : isLocked
+          ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+          : 'border-gray-300 bg-white hover:border-gray-400'
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {/* Status Icon */}
+          <div
+            className={`w-8 h-8 rounded-full flex items-center justify-center ${
+              isCompleted
+                ? 'bg-green-500 text-white'
+                : isActive
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-300 text-gray-600'
+            }`}
+          >
+            {isCompleted ? '✓' : isLocked ? '🔒' : section.id}
+          </div>
+          {/* Arrow */}
+          <svg
+            className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'rotate-90' : ''} ${
+              isLocked ? 'text-gray-400' : 'text-gray-600'
+            }`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+        <div className="flex-1 mr-4">
+          <h3 className={`font-semibold ${isLocked ? 'text-gray-400' : 'text-gray-800'}`}>
+            {section.icon} {section.title}
+          </h3>
+          {isCompleted && summary && (
+            <p className="text-sm text-green-700 mt-1">{summary}</p>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+};
+
+// ============================================
+// MAIN FORM COMPONENT
+// ============================================
 const EnhancedShipmentForm: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams();
 
-  // ===========================
-  // ✅ STATE
-  // ===========================
+  // STATE
   const [formData, setFormData] = useState<ShipmentFormData>(initialFormData);
+  const [activeSection, setActiveSection] = useState(1);
+  const [completedSections, setCompletedSections] = useState<number[]>([]);
   const [dateError, setDateError] = useState('');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ===========================
-  // ✅ EFFECTS
-  // ===========================
+  // ============================================
+  // EFFECTS
+  // ============================================
   useEffect(() => {
     if (formData.movement_date && formData.delivery_date) {
       const startDate = new Date(formData.movement_date);
@@ -67,17 +206,16 @@ const EnhancedShipmentForm: React.FC = () => {
   }, [formData.movement_date, formData.delivery_date]);
 
   useEffect(() => {
-    if (!id) return; // creating a new shipment
+    if (!id) return;
 
     const fetchShipment = async () => {
       try {
         const response = await fetch(`http://localhost:5001/api/shipments/${id}`);
         if (!response.ok) throw new Error('Failed to load shipment');
-
         const data = await response.json();
-
-        // ✅ Always merge with initialFormData so missing fields don't break the UI
         setFormData({ ...initialFormData, ...data });
+        // If editing, mark all sections as accessible
+        setCompletedSections([1, 2, 3, 4, 5]);
       } catch (err) {
         console.error(err);
         alert('فشل تحميل بيانات الشحنة');
@@ -87,21 +225,107 @@ const EnhancedShipmentForm: React.FC = () => {
     fetchShipment();
   }, [id]);
 
-  // ===========================
-  // ✅ HELPERS
-  // ===========================
+  // ============================================
+  // VALIDATION HELPERS
+  // ============================================
   const validateShippingLine = (value: string): boolean => /^[A-Z]{3}$/.test(value);
   const validateContainerNumber = (value: string): boolean => /^[A-Z]{4}[0-9]{7}$/.test(value);
   const validatePhoneNumber = (value: string): boolean => /^[0-9]{10}$/.test(value);
 
-  const validateRequired = (value: any): boolean => {
-    if (value === undefined || value === null) return false;
-    if (typeof value === 'string') return value.trim() !== '';
-    if (typeof value === 'number') return true;
-    return true;
+  // Check if section is complete
+  const isSectionComplete = (sectionId: number): boolean => {
+    switch (sectionId) {
+      case 1:
+        return !!(formData.movement_type && formData.movement_date && formData.freight_type);
+      case 2:
+        return !!formData.client_name;
+      case 3:
+        return !!(formData.container_number && formData.shipping_line && formData.container_weight >= 2);
+      case 4:
+        return true; // Optional section
+      case 5:
+        return !!(
+          (formData.movement_type === 'استيراد' ? formData.delivery_location : formData.loading_location) &&
+          formData.delivery_date &&
+          formData.warehouse_manager
+        );
+      case 6:
+        return true; // Optional section
+      default:
+        return false;
+    }
   };
 
-  // ✅ Build payload in one place (used by submit + optional future actions)
+  // Get section summary for collapsed view
+  const getSectionSummary = (sectionId: number): string => {
+    switch (sectionId) {
+      case 1:
+        return `${formData.movement_type} | ${formData.movement_date} | ${formData.freight_type}`;
+      case 2:
+        return formData.client_name + (formData.clearance_company ? ` | ${formData.clearance_company}` : '');
+      case 3:
+        return `${formData.container_number} | ${formData.container_weight} طن | ${formData.shipping_line}`;
+      case 4:
+        return formData.driver_name || 'لم يتم إدخال بيانات السائق';
+      case 5:
+        const location = formData.movement_type === 'استيراد' ? formData.delivery_location : formData.loading_location;
+        return `${location} | ${formData.delivery_date}`;
+      case 6:
+        return formData.notes ? formData.notes.substring(0, 50) + '...' : 'لا توجد ملاحظات';
+      default:
+        return '';
+    }
+  };
+
+  // ============================================
+  // HANDLERS
+  // ============================================
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    let newValue = value;
+
+    if (name === 'container_number') {
+      newValue = value.replace(/[a-zA-Z]/g, (letter) => letter.toUpperCase());
+    }
+
+    if (name === 'shipping_line') {
+      newValue = value.toUpperCase();
+    }
+
+    if (name === 'driver_phone' || name === 'warehouse_manager_phone') {
+      newValue = value.replace(/\D/g, '');
+      if (newValue.length > 10) newValue = newValue.slice(0, 10);
+    }
+
+    setFormData((prev) => ({ ...prev, [name]: newValue }));
+  };
+
+  const handleAutoSuggestChange = (field: keyof ShipmentFormData, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Mark section as complete and move to next
+  const completeSection = (sectionId: number) => {
+    if (isSectionComplete(sectionId)) {
+      if (!completedSections.includes(sectionId)) {
+        setCompletedSections((prev) => [...prev, sectionId]);
+      }
+      if (sectionId < 6) {
+        setActiveSection(sectionId + 1);
+      }
+    }
+  };
+
+  // Handle section header click
+  const handleSectionClick = (sectionId: number) => {
+    // Can click if completed or is the next available section
+    const maxAccessible = Math.max(...completedSections, 0) + 1;
+    if (completedSections.includes(sectionId) || sectionId <= maxAccessible) {
+      setActiveSection(sectionId);
+    }
+  };
+
+  // Build payload for submission
   const buildPayload = (): any => {
     const schedule = formData.working_schedule;
     const warehouse_working_hours =
@@ -114,133 +338,24 @@ const EnhancedShipmentForm: React.FC = () => {
       warehouse_working_hours,
     };
 
-    // UI-only
     delete payload.working_schedule;
-
-    // ✅ Phase 1: shipment status (frontend-only for now if backend doesn't support it yet)
-    // If your ShipmentFormData doesn't have status yet, this is safe to omit.
-    // payload.status = payload.status || 'open';
-
     return payload;
   };
 
-  // ===========================
-  // ✅ VALIDATION
-  // ===========================
-  const validateForm = (): boolean => {
-    const errors: Record<string, string> = {};
-
-    const requiredFields: (keyof ShipmentFormData)[] = [
-      'movement_date',
-      'movement_type',
-      'freight_type',
-      'client_name',
-      'container_number',
-      'delivery_date',
-      'container_weight',
-      'shipping_line',
-      'warehouse_manager',
-      formData.movement_type === 'استيراد' ? 'delivery_location' : 'loading_location',
-    ];
-
-    requiredFields.forEach((field) => {
-      const value = formData[field];
-      if (!validateRequired(value)) {
-        errors[field] = 'هذا الحقل مطلوب';
-      }
-    });
-
-    if (formData.shipping_line && !validateShippingLine(formData.shipping_line)) {
-      errors.shipping_line = 'يجب أن يتكون الخط الملاحي من 3 أحرف كبيرة فقط';
-    }
-
-    if (formData.container_weight && formData.container_weight < 2) {
-      errors.container_weight = 'يجب أن يكون وزن الحاوية 2 طن أو أكثر';
-    }
-
-    if (formData.container_number && !validateContainerNumber(formData.container_number)) {
-      errors.container_number = 'يجب أن يكون رقم الحاوية 4 أحرف متبوعة بـ 7 أرقام';
-    }
-
-    if (formData.driver_phone && !validatePhoneNumber(formData.driver_phone)) {
-      errors.driver_phone = 'رقم الهاتف يجب أن يكون 10 أرقام بالضبط';
-    }
-
-    if (formData.warehouse_manager_phone && !validatePhoneNumber(formData.warehouse_manager_phone)) {
-      errors.warehouse_manager_phone = 'رقم الهاتف يجب أن يكون 10 أرقام بالضبط';
-    }
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  // ===========================
-  // ✅ HANDLERS
-  // ===========================
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    let newValue = value;
-
-    if (name === 'container_number') {
-      newValue = value.replace(/[a-zA-Z]/g, (letter) => letter.toUpperCase());
-      setFormErrors((prev) => ({
-        ...prev,
-        container_number: validateContainerNumber(newValue)
-          ? ''
-          : 'يجب أن يكون رقم الحاوية 4 أحرف متبوعة بـ 7 أرقام',
-      }));
-    }
-
-    if (name === 'shipping_line') {
-      newValue = value.toUpperCase();
-    }
-
-    if (name === 'driver_phone' || name === 'warehouse_manager_phone') {
-      newValue = value.replace(/\D/g, '');
-      if (newValue.length > 10) newValue = newValue.slice(0, 10);
-
-      setFormErrors((prev) => ({
-        ...prev,
-        [name]: validatePhoneNumber(newValue) ? '' : 'رقم الهاتف يجب أن يكون 10 أرقام بالضبط',
-      }));
-    }
-
-    setFormData((prev) => ({ ...prev, [name]: newValue }));
-
-    if (
-      name !== 'container_number' &&
-      name !== 'driver_phone' &&
-      name !== 'warehouse_manager_phone' &&
-      formErrors[name]
-    ) {
-      setFormErrors((prev) => ({ ...prev, [name]: '' }));
-    }
-  };
-
-  const handleAutoSuggestChange = (field: keyof ShipmentFormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    if (formErrors[field]) {
-      setFormErrors((prev) => {
-        const next = { ...prev };
-        delete next[field];
-        return next;
-      });
-    }
-  };
-
-  // ===========================
-  // ✅ SUBMIT
-  // ===========================
-  const submitForm = async (showPrint: boolean = false) => {
+  // Submit form
+  const handleSubmit = async () => {
     if (dateError) {
       alert('يرجى تصحيح تواريخ النموذج قبل الحفظ');
       return;
     }
 
-    if (!validateForm()) {
-      alert('يرجى ملء جميع الحقول المطلوبة وتصحيح الأخطاء');
+    // Check required sections
+    const requiredSections = [1, 2, 3, 5];
+    const incompleteSections = requiredSections.filter((s) => !isSectionComplete(s));
+    
+    if (incompleteSections.length > 0) {
+      alert('يرجى إكمال جميع الأقسام المطلوبة');
+      setActiveSection(incompleteSections[0]);
       return;
     }
 
@@ -261,12 +376,8 @@ const EnhancedShipmentForm: React.FC = () => {
 
       if (!response.ok) throw new Error('خطأ أثناء حفظ البيانات');
 
-      alert(showPrint ? 'تم الحفظ! سيتم الطباعة...' : 'تم إضافة الشحنة بنجاح!');
-
-      setFormData(initialFormData);
+      alert('تم حفظ الشحنة بنجاح!');
       navigate('/dashboard', { state: { refresh: true } });
-
-      if (showPrint) window.print();
     } catch (error: any) {
       alert('حدث خطأ: ' + error.message);
     } finally {
@@ -274,592 +385,619 @@ const EnhancedShipmentForm: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    submitForm(false);
-  };
+  // ============================================
+  // RENDER SECTIONS
+  // ============================================
+  const renderSection1 = () => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Movement Type */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">نوع العملية *</label>
+          <select
+            name="movement_type"
+            value={formData.movement_type}
+            onChange={handleChange}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="استيراد">استيراد</option>
+            <option value="تصدير">تصدير</option>
+          </select>
+        </div>
 
-  const handleSaveAndPrint = (e: React.MouseEvent) => {
-    e.preventDefault();
-    submitForm(true);
-  };
+        {/* Movement Date */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">تاريخ اليوم *</label>
+          <input
+            type="date"
+            name="movement_date"
+            value={formData.movement_date}
+            onChange={handleChange}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
 
-  // ✅ Back button behavior (requested)
-  const handleBack = () => {
-    navigate('/dashboard');
-  };
+        {/* Freight Type */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">نوع الشحن *</label>
+          <select
+            name="freight_type"
+            value={formData.freight_type}
+            onChange={handleChange}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">اختر النوع</option>
+            <option value="SEA">🚢 بحري (SEA)</option>
+            <option value="AIR">✈️ جوي (AIR)</option>
+            <option value="TRK">🚛 بري (TRK)</option>
+          </select>
+        </div>
+      </div>
 
-  const deliverySectionTitle = useMemo(
-    () => (formData.movement_type === 'استيراد' ? 'معلومات التسليم' : 'معلومات التحميل'),
-    [formData.movement_type]
+      {/* Continue Button */}
+      <div className="flex justify-start mt-6">
+        <button
+          type="button"
+          onClick={() => completeSection(1)}
+          disabled={!isSectionComplete(1)}
+          className={`px-6 py-3 rounded-lg font-medium transition-all ${
+            isSectionComplete(1)
+              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
+        >
+          متابعة ←
+        </button>
+      </div>
+    </div>
   );
 
-  // ===========================
-  // ✅ RETURN
-  // ===========================
-  return (
-    <div className="min-h-screen bg-gray-100 py-8 print:bg-white" dir="rtl">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white shadow rounded-lg print:shadow-none">
-          {/* ===========================
-              HEADER
-          =========================== */}
-          <div className="px-6 py-4 border-b border-gray-200 no-print flex items-center justify-between">
-            <div className="text-right">
-              <h1 className="text-2xl font-bold text-gray-800">نموذج الحاويات اليومية</h1>
-              <p className="text-gray-600 mt-2">Daily Containers Form - النموذج التشغيلي اليومي</p>
-            </div>
+  const renderSection2 = () => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Client Name */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">اسم العميل *</label>
+          <AutoSuggestInput
+            field="client_name"
+            value={formData.client_name}
+            onChange={(value) => handleAutoSuggestChange('client_name', value)}
+            placeholder="اسم العميل"
+          />
+        </div>
 
-            {/* ✅ Back button (requested) */}
-            <button
-              type="button"
-              onClick={handleBack}
-              className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300 transition"
+        {/* Clearance Company */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">شركة التخليص</label>
+          <input
+            type="text"
+            name="clearance_company"
+            value={formData.clearance_company}
+            onChange={handleChange}
+            placeholder="اختياري"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+
+        {/* Container Leak Status */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">مسرب الحاوية</label>
+          <select
+            name="container_leak_status"
+            value={formData.container_leak_status}
+            onChange={handleChange}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="green">🟢 خروج</option>
+            <option value="yellow">🟡 معاينة غير فعلية</option>
+            <option value="red">🔴 معاينة فعلية</option>
+            <option value="other">أخرى</option>
+          </select>
+          {formData.container_leak_status === 'other' && (
+            <input
+              type="text"
+              name="container_leak_custom"
+              value={formData.container_leak_custom}
+              onChange={handleChange}
+              placeholder="أدخل حالة المسرب"
+              className="w-full mt-2 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          )}
+        </div>
+
+        {/* Customs Permit Number */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">رقم التصريح الجمركي</label>
+          <input
+            type="text"
+            name="customs_permit_number"
+            value={formData.customs_permit_number}
+            onChange={handleChange}
+            placeholder="اختياري"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+
+        {/* Goods Description */}
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-2">وصف البضاعة</label>
+          <textarea
+            name="goods_description"
+            value={formData.goods_description}
+            onChange={handleChange}
+            rows={2}
+            placeholder="وصف مختصر للبضاعة..."
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+      </div>
+
+      {/* Continue Button */}
+      <div className="flex justify-start mt-6">
+        <button
+          type="button"
+          onClick={() => completeSection(2)}
+          disabled={!isSectionComplete(2)}
+          className={`px-6 py-3 rounded-lg font-medium transition-all ${
+            isSectionComplete(2)
+              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
+        >
+          متابعة ←
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderSection3 = () => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Container Size */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">حجم الحاوية</label>
+          <select
+            name="container_size"
+            value={formData.container_size}
+            onChange={handleChange}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="20dry">📦 Dry 20 ft</option>
+            <option value="40dry">📦 Dry 40 ft</option>
+            <option value="40hcdry">📦 High Cube Dry 40 ft</option>
+            <option value="20reefer">❄️ Reefer 20 ft</option>
+            <option value="40reefer">❄️ Reefer 40 ft</option>
+            <option value="opentop20">📭 Open Top 20 ft</option>
+            <option value="opentop40">📭 Open Top 40 ft</option>
+            <option value="flatrack20">🔲 Flat Rack 20 ft</option>
+            <option value="flatrack40">🔲 Flat Rack 40 ft</option>
+            <option value="tank20">🛢️ Tank Container 20 ft</option>
+          </select>
+        </div>
+
+        {/* Container Weight */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">وزن الحاوية (طن) *</label>
+          <input
+            type="number"
+            name="container_weight"
+            value={formData.container_weight}
+            onChange={handleChange}
+            min="2"
+            step="0.1"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+
+        {/* Container Number */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">رقم الحاوية *</label>
+          <AutoSuggestInput
+            field="container_number"
+            value={formData.container_number}
+            onChange={(value) => handleAutoSuggestChange('container_number', value.toUpperCase())}
+            placeholder="ABCD1234567"
+          />
+          <p className="text-xs text-gray-500 mt-1">4 أحرف + 7 أرقام</p>
+        </div>
+
+        {/* Shipping Line */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">الخط الملاحي *</label>
+          <input
+            type="text"
+            name="shipping_line"
+            value={formData.shipping_line}
+            onChange={handleChange}
+            placeholder="MSC"
+            maxLength={3}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">3 أحرف كبيرة</p>
+        </div>
+
+        {/* Bill of Lading */}
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-2">رقم البوليصة</label>
+          <input
+            type="text"
+            name="bill_of_lading_number"
+            value={formData.bill_of_lading_number}
+            onChange={handleChange}
+            placeholder="اختياري"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+      </div>
+
+      {/* Continue Button */}
+      <div className="flex justify-start mt-6">
+        <button
+          type="button"
+          onClick={() => completeSection(3)}
+          disabled={!isSectionComplete(3)}
+          className={`px-6 py-3 rounded-lg font-medium transition-all ${
+            isSectionComplete(3)
+              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
+        >
+          متابعة ←
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderSection4 = () => (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-500 mb-4">هذا القسم اختياري - يمكنك المتابعة بدون تعبئته</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Driver Name */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">اسم السائق</label>
+          <AutoSuggestInput
+            field="driver_name"
+            value={formData.driver_name}
+            onChange={(value) => handleAutoSuggestChange('driver_name', value)}
+            placeholder="اسم السائق"
+          />
+        </div>
+
+        {/* Driver Phone */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">رقم هاتف السائق</label>
+          <input
+            type="tel"
+            name="driver_phone"
+            value={formData.driver_phone}
+            onChange={handleChange}
+            placeholder="0791234567"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+
+        {/* Tractor Number */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">رقم القاطرة</label>
+          <input
+            type="text"
+            name="tractor_number"
+            value={formData.tractor_number}
+            onChange={handleChange}
+            placeholder="60-12345"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+
+        {/* Trailer Number */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">رقم المقطورة</label>
+          <input
+            type="text"
+            name="trailer_number"
+            value={formData.trailer_number}
+            onChange={handleChange}
+            placeholder="71-12345"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+      </div>
+
+      {/* Continue Button */}
+      <div className="flex justify-start mt-6">
+        <button
+          type="button"
+          onClick={() => completeSection(4)}
+          className="px-6 py-3 rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-700 transition-all"
+        >
+          متابعة ←
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderSection5 = () => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Delivery/Loading Location */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            {formData.movement_type === 'استيراد' ? 'موقع التسليم' : 'موقع التحميل'} *
+          </label>
+          <input
+            type="text"
+            name={formData.movement_type === 'استيراد' ? 'delivery_location' : 'loading_location'}
+            value={formData.movement_type === 'استيراد' ? formData.delivery_location : formData.loading_location}
+            onChange={(e) => {
+              const field = formData.movement_type === 'استيراد' ? 'delivery_location' : 'loading_location';
+              setFormData({ ...formData, [field]: e.target.value });
+            }}
+            placeholder="عمان، الزرقاء، العقبة..."
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+
+        {/* Delivery/Loading Date */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            {formData.movement_type === 'استيراد' ? 'تاريخ التسليم' : 'تاريخ التحميل'} *
+          </label>
+          <input
+            type="date"
+            name="delivery_date"
+            value={formData.delivery_date}
+            onChange={handleChange}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+          {dateError && <p className="text-red-500 text-sm mt-1">{dateError}</p>}
+        </div>
+
+        {/* Warehouse Manager */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">مسؤول المستودع *</label>
+          <input
+            type="text"
+            name="warehouse_manager"
+            value={formData.warehouse_manager}
+            onChange={handleChange}
+            placeholder="اسم المسؤول"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+
+        {/* Warehouse Manager Phone */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">رقم هاتف المسؤول</label>
+          <input
+            type="tel"
+            name="warehouse_manager_phone"
+            value={formData.warehouse_manager_phone}
+            onChange={handleChange}
+            placeholder="0791234567"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+      </div>
+
+      {/* Working Schedule */}
+      <div className="p-4 bg-gray-50 rounded-lg">
+        <label className="block text-sm font-medium text-gray-700 mb-3">جدول عمل المستودع</label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Days */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm">من</span>
+            <select
+              value={formData.working_schedule?.days?.[0] || ''}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  working_schedule: {
+                    ...prev.working_schedule!,
+                    days: [e.target.value, prev.working_schedule?.days?.[1] || ''],
+                  },
+                }))
+              }
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
             >
-              رجوع للوحة التحكم
-            </button>
+              <option value="">اليوم</option>
+              <option value="الأحد">الأحد</option>
+              <option value="الإثنين">الإثنين</option>
+              <option value="الثلاثاء">الثلاثاء</option>
+              <option value="الأربعاء">الأربعاء</option>
+              <option value="الخميس">الخميس</option>
+              <option value="الجمعة">الجمعة</option>
+              <option value="السبت">السبت</option>
+            </select>
+            <span className="text-sm">إلى</span>
+            <select
+              value={formData.working_schedule?.days?.[1] || ''}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  working_schedule: {
+                    ...prev.working_schedule!,
+                    days: [prev.working_schedule?.days?.[0] || '', e.target.value],
+                  },
+                }))
+              }
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+            >
+              <option value="">اليوم</option>
+              <option value="الأحد">الأحد</option>
+              <option value="الإثنين">الإثنين</option>
+              <option value="الثلاثاء">الثلاثاء</option>
+              <option value="الأربعاء">الأربعاء</option>
+              <option value="الخميس">الخميس</option>
+              <option value="الجمعة">الجمعة</option>
+              <option value="السبت">السبت</option>
+            </select>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6">
-            {/* SECTION 1 */}
-            <div className="mb-8 pb-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">نوع العملية والتاريخ ونوع الشحن</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Process Type */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">نوع العملية *</label>
-                  <select
-                    name="movement_type"
-                    value={formData.movement_type}
-                    onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      formErrors.movement_type ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  >
-                    <option value="استيراد">استيراد</option>
-                    <option value="تصدير">تصدير</option>
-                  </select>
-                  {formErrors.movement_type && (
-                    <p className="text-red-500 text-sm mt-1 text-right">{formErrors.movement_type}</p>
-                  )}
-                </div>
+          {/* Times */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm">الساعة</span>
+            <input
+              type="time"
+              value={formData.working_schedule?.start_time || ''}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  working_schedule: { ...prev.working_schedule!, start_time: e.target.value },
+                }))
+              }
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+            />
+            <span className="text-sm">إلى</span>
+            <input
+              type="time"
+              value={formData.working_schedule?.end_time || ''}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  working_schedule: { ...prev.working_schedule!, end_time: e.target.value },
+                }))
+              }
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+        </div>
+      </div>
 
-                {/* Movement Date */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">تاريخ اليوم *</label>
-                  <input
-                    type="date"
-                    name="movement_date"
-                    value={formData.movement_date}
-                    onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      formErrors.movement_date ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  />
-                  {formErrors.movement_date && (
-                    <p className="text-red-500 text-sm mt-1 text-right">{formErrors.movement_date}</p>
-                  )}
-                </div>
+      {/* Continue Button */}
+      <div className="flex justify-start mt-6">
+        <button
+          type="button"
+          onClick={() => completeSection(5)}
+          disabled={!isSectionComplete(5)}
+          className={`px-6 py-3 rounded-lg font-medium transition-all ${
+            isSectionComplete(5)
+              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
+        >
+          متابعة ←
+        </button>
+      </div>
+    </div>
+  );
 
-                {/* Freight Type */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">نوع الشحن *</label>
-                  <select
-                    name="freight_type"
-                    value={formData.freight_type}
-                    onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      formErrors.freight_type ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  >
-                    <option value="">اختر النوع</option>
-                    <option value="AIR">AIR</option>
-                    <option value="SEA">SEA</option>
-                    <option value="TRK">TRK</option>
-                  </select>
-                  {formErrors.freight_type && (
-                    <p className="text-red-500 text-sm mt-1 text-right">{formErrors.freight_type}</p>
-                  )}
-                </div>
-              </div>
+  const renderSection6 = () => (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">ملاحظات إضافية</label>
+        <textarea
+          name="notes"
+          value={formData.notes || ''}
+          onChange={handleChange}
+          rows={4}
+          placeholder="أي ملاحظات إضافية حول الشحنة..."
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+      </div>
+
+      {/* Submit Button */}
+      <div className="flex gap-4 mt-6">
+        <button
+          type="button"
+          onClick={() => navigate('/dashboard')}
+          className="px-6 py-3 rounded-lg font-medium bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all"
+        >
+          إلغاء
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+          className={`px-8 py-3 rounded-lg font-medium transition-all ${
+            isSubmitting
+              ? 'bg-gray-400 cursor-not-allowed'
+              : 'bg-green-600 text-white hover:bg-green-700'
+          }`}
+        >
+          {isSubmitting ? 'جاري الحفظ...' : '✓ حفظ الشحنة'}
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderActiveSection = () => {
+    switch (activeSection) {
+      case 1: return renderSection1();
+      case 2: return renderSection2();
+      case 3: return renderSection3();
+      case 4: return renderSection4();
+      case 5: return renderSection5();
+      case 6: return renderSection6();
+      default: return null;
+    }
+  };
+
+  // ============================================
+  // MAIN RENDER
+  // ============================================
+  return (
+    <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
+      <div className="max-w-4xl mx-auto px-4">
+        {/* Header */}
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">نموذج الحاويات اليومية</h1>
+              <p className="text-gray-500 mt-1">Daily Containers Form</p>
             </div>
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard')}
+              className="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all"
+            >
+              ✕ إغلاق
+            </button>
+          </div>
+        </div>
 
-            {/* SECTION 2 */}
-            <div className="mb-8 pb-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">معلومات العميل</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Client Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">اسم العميل *</label>
-                  <AutoSuggestInput
-                    field="client_name"
-                    value={formData.client_name}
-                    onChange={(value) => handleAutoSuggestChange('client_name', value)}
-                    placeholder="اسم العميل"
-                    className={formErrors.client_name ? 'border-red-500' : ''}
-                  />
-                  {formErrors.client_name && (
-                    <p className="text-red-500 text-sm mt-1 text-right">{formErrors.client_name}</p>
-                  )}
-                </div>
+        {/* Progress Indicator */}
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+          <ProgressIndicator currentSection={activeSection} completedSections={completedSections} />
+        </div>
 
-                {/* Clearance Company */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">شركة التخليص</label>
-                  <input
-                    type="text"
-                    name="clearance_company"
-                    value={formData.clearance_company}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+        {/* Sections */}
+        <div className="space-y-4">
+          {SECTIONS.map((section) => {
+            const isActive = activeSection === section.id;
+            const isCompleted = completedSections.includes(section.id);
+            const maxAccessible = Math.max(...completedSections, 0) + 1;
+            const isLocked = section.id > maxAccessible && !isCompleted;
 
-                {/* Container Leak Status */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">مسرب الحاوية</label>
-                  <select
-                    name="container_leak_status"
-                    value={formData.container_leak_status}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="green">🟢 خروج</option>
-                    <option value="yellow">🟡 معاينة غير فعلية</option>
-                    <option value="red">🔴 معاينة فعلية</option>
-                    <option value="other">أخرى</option>
-                  </select>
-
-                  {formData.container_leak_status === 'other' && (
-                    <input
-                      type="text"
-                      name="container_leak_custom"
-                      value={formData.container_leak_custom}
-                      onChange={handleChange}
-                      placeholder="أدخل حالة المسرب"
-                      className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  )}
-                </div>
-
-                {/* Customs Permit Number */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">رقم التصريح الجمركي</label>
-                  <input
-                    type="text"
-                    name="customs_permit_number"
-                    value={formData.customs_permit_number}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                {/* Goods Description */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">وصف البضاعة</label>
-                  <textarea
-                    name="goods_description"
-                    value={formData.goods_description}
-                    onChange={handleChange}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* SECTION 3 */}
-            <div className="mb-8 pb-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">معلومات الحاوية</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Container Size */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">حجم الحاوية</label>
-                  <select
-                    name="container_size"
-                    value={formData.container_size}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="20dry"> Dry 20 ft</option>
-                    <option value="40dry"> Dry 40 ft</option>
-                    <option value="40hcdry">High Cube Dry 40 ft </option>
-                    <option value="20reefer">Reefer 20 ft</option>
-                    <option value="40reefer">Reefer 40 ft </option>
-
-                    <option value="opentop20">Open Top 20 ft</option>
-                    <option value="opentop40">Open Top 40 ft</option>
-                    <option value="flatrack20">Flat Rack 20 ft</option>
-                    <option value="flatrack40">Flat Rack 40 ft</option>
-                    <option value="tank20">Tank Container 20 ft</option>
-                  </select>
-                </div>
-
-                {/* Container Weight */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">وزن الحاوية (طن) *</label>
-                  <input
-                    type="number"
-                    name="container_weight"
-                    value={formData.container_weight}
-                    onChange={handleChange}
-                    min="2"
-                    step="0.1"
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      formErrors.container_weight ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="2"
-                  />
-                  {formErrors.container_weight && (
-                    <p className="text-red-500 text-sm mt-1 text-right">{formErrors.container_weight}</p>
-                  )}
-                </div>
-
-                {/* Container Number */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">رقم الحاوية *</label>
-                  <AutoSuggestInput
-                    field="container_number"
-                    value={formData.container_number}
-                    onChange={(value) => handleAutoSuggestChange('container_number', value.toUpperCase())}
-                    placeholder="أدخل رقم الحاوية"
-                    className={formErrors.container_number ? 'border-red-500' : ''}
-                  />
-                  {formErrors.container_number && (
-                    <p className="text-red-500 text-sm mt-1 text-right">{formErrors.container_number}</p>
-                  )}
-                </div>
-
-                {/* Shipping Line */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">الخط الملاحي *</label>
-                  <input
-                    type="text"
-                    name="shipping_line"
-                    value={formData.shipping_line}
-                    onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      formErrors.shipping_line ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="MSC"
-                  />
-                  {formErrors.shipping_line && (
-                    <p className="text-red-500 text-sm mt-1 text-right">{formErrors.shipping_line}</p>
-                  )}
-                </div>
-
-                {/* Bill of Lading Number */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">رقم البوليصة</label>
-                  <input
-                    type="text"
-                    name="bill_of_lading_number"
-                    value={formData.bill_of_lading_number}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* SECTION 4 */}
-            <div className="mb-8 pb-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">معلومات السائق والمركبة</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Driver Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">اسم السائق</label>
-                  <AutoSuggestInput
-                    field="driver_name"
-                    value={formData.driver_name}
-                    onChange={(value) => handleAutoSuggestChange('driver_name', value)}
-                    placeholder="اسم السائق"
-                  />
-                </div>
-
-                {/* Driver Phone */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">رقم هاتف السائق</label>
-                  <input
-                    type="tel"
-                    name="driver_phone"
-                    value={formData.driver_phone}
-                    onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-                      formErrors.driver_phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
-                    }`}
-                  />
-                  {formErrors.driver_phone && <p className="text-red-500 text-sm mt-1">{formErrors.driver_phone}</p>}
-                </div>
-
-                {/* Tractor Number */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">رقم القاطرة</label>
-                  <input
-                    type="text"
-                    name="tractor_number"
-                    value={formData.tractor_number}
-                    onChange={handleChange}
-                    placeholder="60-12345"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    pattern="60-?[0-9]{1,5}"
-                    title="تبدأ بـ 60 متبوعة بـ 1-5 أرقام"
-                  />
-                </div>
-
-                {/* Trailer Number */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">رقم المقطورة</label>
-                  <input
-                    type="text"
-                    name="trailer_number"
-                    value={formData.trailer_number}
-                    onChange={handleChange}
-                    placeholder="71-12345"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    pattern="71-?[0-9]{1,5}"
-                    title="تبدأ بـ 71 متبوعة بـ 1-5 أرقام"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* SECTION 5 */}
-            <div className="mb-8 pb-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">{deliverySectionTitle}</h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Delivery/Loading Location */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
-                    {formData.movement_type === 'استيراد' ? 'موقع التسليم' : 'موقع التحميل'} *
-                  </label>
-                  <input
-                    type="text"
-                    name={formData.movement_type === 'استيراد' ? 'delivery_location' : 'loading_location'}
-                    value={formData.movement_type === 'استيراد' ? formData.delivery_location : formData.loading_location}
-                    onChange={(e) => {
-                      if (formData.movement_type === 'استيراد') {
-                        setFormData({ ...formData, delivery_location: e.target.value });
-                      } else {
-                        setFormData({ ...formData, loading_location: e.target.value });
-                      }
-                    }}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  {formData.movement_type === 'استيراد'
-                    ? formErrors.delivery_location && (
-                        <p className="text-red-500 text-sm mt-1 text-right">{formErrors.delivery_location}</p>
-                      )
-                    : formErrors.loading_location && (
-                        <p className="text-red-500 text-sm mt-1 text-right">{formErrors.loading_location}</p>
-                      )}
-                </div>
-
-                {/* Delivery/Loading Date */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
-                    {formData.movement_type === 'استيراد' ? 'تاريخ التسليم' : 'تاريخ التحميل'} *
-                  </label>
-                  <input
-                    type="date"
-                    name="delivery_date"
-                    value={formData.delivery_date}
-                    onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      formErrors.delivery_date ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  />
-                  {formErrors.delivery_date && (
-                    <p className="text-red-500 text-sm mt-1 text-right">{formErrors.delivery_date}</p>
-                  )}
-                </div>
-
-                {/* Warehouse Manager */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">مسؤول المستودع</label>
-                  <input
-                    type="text"
-                    name="warehouse_manager"
-                    value={formData.warehouse_manager}
-                    onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      formErrors.warehouse_manager ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  />
-                  {formErrors.warehouse_manager && (
-                    <p className="text-red-500 text-sm mt-1 text-right">{formErrors.warehouse_manager}</p>
-                  )}
-                </div>
-
-                {/* Warehouse Manager Phone */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">رقم هاتف مسؤول المستودع</label>
-                  <input
-                    type="tel"
-                    name="warehouse_manager_phone"
-                    value={formData.warehouse_manager_phone}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  {formErrors.warehouse_manager_phone && (
-                    <p className="text-red-500 text-sm mt-1">{formErrors.warehouse_manager_phone}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* WORKING SCHEDULE */}
-              <div className="mb-6 mt-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2 text-right">جدول عمل مسؤول المستودع</label>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Days */}
-                  <div className="flex items-center gap-2">
-                    <span>يعمل من</span>
-                    <select
-                      value={formData.working_schedule?.days?.[0] || ''}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          working_schedule: {
-                            ...prev.working_schedule!,
-                            days: [e.target.value, prev.working_schedule?.days?.[1] || ''],
-                          },
-                        }))
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">اختر اليوم</option>
-                      <option value="الأحد">الأحد</option>
-                      <option value="الإثنين">الإثنين</option>
-                      <option value="الثلاثاء">الثلاثاء</option>
-                      <option value="الأربعاء">الأربعاء</option>
-                      <option value="الخميس">الخميس</option>
-                      <option value="الجمعة">الجمعة</option>
-                      <option value="السبت">السبت</option>
-                    </select>
-                    <span>إلى</span>
-                    <select
-                      value={formData.working_schedule?.days?.[1] || ''}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          working_schedule: {
-                            ...prev.working_schedule!,
-                            days: [prev.working_schedule?.days?.[0] || '', e.target.value],
-                          },
-                        }))
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">اختر اليوم</option>
-                      <option value="الأحد">الأحد</option>
-                      <option value="الإثنين">الإثنين</option>
-                      <option value="الثلاثاء">الثلاثاء</option>
-                      <option value="الأربعاء">الأربعاء</option>
-                      <option value="الخميس">الخميس</option>
-                      <option value="الجمعة">الجمعة</option>
-                      <option value="السبت">السبت</option>
-                    </select>
-                  </div>
-
-                  {/* Times */}
-                  <div className="flex items-center gap-2">
-                    <span>ومن الساعة</span>
-                    <input
-                      type="time"
-                      value={formData.working_schedule?.start_time || ''}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          working_schedule: {
-                            ...prev.working_schedule!,
-                            start_time: e.target.value,
-                          },
-                        }))
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <span>إلى</span>
-                    <input
-                      type="time"
-                      value={formData.working_schedule?.end_time || ''}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          working_schedule: {
-                            ...prev.working_schedule!,
-                            end_time: e.target.value,
-                          },
-                        }))
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+            return (
+              <div key={section.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <SectionHeader
+                  section={section}
+                  isActive={isActive}
+                  isCompleted={isCompleted}
+                  isLocked={isLocked}
+                  onClick={() => handleSectionClick(section.id)}
+                  summary={isCompleted ? getSectionSummary(section.id) : undefined}
+                />
+                
+                {/* Section Content */}
+                <div
+                  className={`transition-all duration-300 ease-in-out ${
+                    isActive ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
+                  }`}
+                >
+                  <div className="p-6 border-t border-gray-100">
+                    {renderActiveSection()}
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* SECTION 6 */}
-            <div className="mb-8 pb-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">ملاحظات إضافية</h2>
-              <div className="grid grid-cols-1 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">ملاحظات</label>
-                  <textarea
-                    name="notes"
-                    value={formData.notes || ''}
-                    onChange={handleChange}
-                    rows={4}
-                    placeholder="أي ملاحظات إضافية حول الشحنة..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* BUTTONS */}
-            <div className="mt-8 flex justify-end space-x-4 space-x-reverse no-print">
-              {/* Cancel */}
-              <button
-                type="button"
-                onClick={() => navigate('/dashboard')}
-                disabled={isSubmitting}
-                className={`bg-gray-300 text-gray-700 px-6 py-2 rounded-md transition duration-200 ${
-                  isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-400'
-                }`}
-              >
-                إلغاء
-              </button>
-
-              {/* Save */}
-              <button
-                type="submit"
-                disabled={!!dateError || isSubmitting}
-                className={`px-6 py-2 rounded-md transition duration-200 ${
-                  dateError || isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'
-                }`}
-              >
-                {isSubmitting ? 'جاري الحفظ...' : 'حفظ النموذج'}
-              </button>
-
-              {/* Save & Print */}
-              <button
-                type="button"
-                disabled={!!dateError || isSubmitting}
-                className={`px-6 py-2 rounded-md transition duration-200 ${
-                  dateError || isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white'
-                }`}
-                onClick={handleSaveAndPrint}
-              >
-                {isSubmitting ? 'جاري الحفظ...' : 'حفظ وطباعة'}
-              </button>
-            </div>
-          </form>
+            );
+          })}
         </div>
       </div>
     </div>
   );
 };
 
+// Export with the same name as your original file so routes don't break
 export default EnhancedShipmentForm;
+
