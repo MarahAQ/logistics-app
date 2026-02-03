@@ -16,6 +16,8 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/shipments', shipmentRoutes);
 
+
+
 // Basic route
 app.get('/', (req, res) => {
   res.json({ message: 'Logistics API Server is running!' });

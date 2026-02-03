@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-
+import { useAuth } from '../context/AuthContext.tsx';
 // ============================================
-// NAVIGATION ITEMS
+// NAVIGATION ITEMS (with role restrictions)
 // ============================================
 const NAV_ITEMS = [
   {
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
       </svg>
     ),
+    roles: ['manager', 'operator', 'accountant'], // All roles
   },
   {
     path: '/shipments/daily',
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
       </svg>
     ),
+    roles: ['manager', 'operator'], // Not accountant
   },
   {
     path: '/export',
@@ -31,6 +33,7 @@ const NAV_ITEMS = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
     ),
+    roles: ['manager', 'accountant'], // Manager and Accountant
   },
   {
     path: '/reports',
@@ -40,6 +43,7 @@ const NAV_ITEMS = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
       </svg>
     ),
+    roles: ['manager', 'operator', 'accountant'],
     comingSoon: true,
   },
   {
@@ -51,13 +55,12 @@ const NAV_ITEMS = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
       </svg>
     ),
+    roles: ['manager'], // Manager only
     comingSoon: true,
   },
 ];
 
-// ============================================
-// ROLE LABELS
-// ============================================
+// Role labels and colors
 const ROLE_LABELS: Record<string, string> = {
   manager: 'مدير',
   operator: 'مشغل',
@@ -83,15 +86,20 @@ const Sidebar: React.FC<SidebarProps> = ({
   userRole = 'operator' 
 }) => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const handleLogout = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user_data');
+    logout();
     navigate('/');
   };
 
   const closeMobile = () => setIsMobileOpen(false);
+
+  // Filter nav items based on user role
+  const visibleNavItems = NAV_ITEMS.filter(item => 
+    item.roles.includes(userRole)
+  );
 
   // ============================================
   // SIDEBAR CONTENT
@@ -101,7 +109,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* Logo Section */}
       <div className="p-5 border-b border-gray-100">
         <div className="flex items-center gap-3">
-          {/* JT Logo */}
           <div className="w-11 h-11 bg-black rounded-xl flex items-center justify-center shadow-sm">
             <span className="text-white font-bold text-lg tracking-tight">jt</span>
           </div>
@@ -114,17 +121,25 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map((item) => (
+        {visibleNavItems.map((item) => (
           <NavLink
             key={item.path}
-            to={item.path}
-            onClick={closeMobile}
+            to={item.comingSoon ? '#' : item.path}
+            onClick={(e) => {
+              if (item.comingSoon) {
+                e.preventDefault();
+                alert('هذه الميزة قيد التطوير وستكون متاحة قريباً');
+              }
+              closeMobile();
+            }}
             className={({ isActive }) =>
               `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-                isActive
+                item.comingSoon 
+                  ? 'opacity-50 cursor-not-allowed text-gray-400'
+                  : isActive
                   ? 'bg-sky-50 text-sky-600 font-medium shadow-sm'
                   : 'text-gray-600 hover:bg-gray-50'
-              } ${item.comingSoon ? 'opacity-50 pointer-events-none' : ''}`
+              }`
             }
           >
             <span className="flex-shrink-0">{item.icon}</span>
