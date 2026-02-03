@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
-// Auth - Note: App.tsx is in src/, context is in src/context/
+// Auth
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -36,7 +36,7 @@ function App() {
               </ProtectedRoute>
             }
           >
-            {/* All authenticated users can access */}
+            {/* All authenticated users can access Dashboard */}
             <Route path="/dashboard" element={<Dashboard />} />
             
             {/* Manager and Operator can create/edit shipments */}
@@ -57,11 +57,11 @@ function App() {
               } 
             />
 
-            {/* Export - Manager and Accountant */}
+            {/* Export - ALL roles can export */}
             <Route 
               path="/export" 
               element={
-                <ProtectedRoute allowedRoles={['manager', 'accountant']}>
+                <ProtectedRoute allowedRoles={['manager', 'operator', 'accountant']}>
                   <ExportPage />
                 </ProtectedRoute>
               } 

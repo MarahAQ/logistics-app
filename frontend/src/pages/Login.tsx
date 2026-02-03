@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const API_BASE = 'http://localhost:5001';
 
@@ -8,12 +9,27 @@ const API_BASE = 'http://localhost:5001';
 // ============================================
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const { login, isAuthenticated, isLoading } = useAuth();
 
   // Form state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // If already authenticated, redirect to dashboard
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, isLoading, navigate]);
+
+  // Clear form on mount (important for logout->login flow)
+  useEffect(() => {
+    setEmail('');
+    setPassword('');
+    setError('');
+  }, []);
 
   // Handle login
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,7 +42,7 @@ const Login: React.FC = () => {
       return;
     }
 
-    setIsLoading(true);
+    setIsSubmitting(true);
 
     try {
       const response = await fetch(`${API_BASE}/api/auth/login`, {
@@ -43,18 +59,26 @@ const Login: React.FC = () => {
         throw new Error(data.error || 'فشل تسجيل الدخول');
       }
 
-      // Save token and user data
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('user_data', JSON.stringify(data.user));
+      // Use AuthContext login function
+      login(data.token, data.user);
 
       // Navigate to dashboard
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.message || 'حدث خطأ أثناء تسجيل الدخول');
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
+
+  // Show loading while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-8 h-8 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4" dir="rtl">
@@ -96,7 +120,8 @@ const Login: React.FC = () => {
                 placeholder="example@jericho.com"
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all text-left"
                 dir="ltr"
-                disabled={isLoading}
+                disabled={isSubmitting}
+                autoComplete="email"
               />
             </div>
 
@@ -111,21 +136,22 @@ const Login: React.FC = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all"
-                disabled={isLoading}
+                disabled={isSubmitting}
+                autoComplete="current-password"
               />
             </div>
 
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isSubmitting}
               className={`w-full py-3 rounded-xl font-medium transition-all ${
-                isLoading
+                isSubmitting
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-black text-white hover:bg-gray-800 shadow-lg'
               }`}
             >
-              {isLoading ? (
+              {isSubmitting ? (
                 <span className="flex items-center justify-center gap-2">
                   <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />

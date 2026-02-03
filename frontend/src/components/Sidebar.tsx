@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext.tsx';
+import { NavLink } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+
 // ============================================
 // NAVIGATION ITEMS (with role restrictions)
 // ============================================
@@ -13,7 +14,7 @@ const NAV_ITEMS = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
       </svg>
     ),
-    roles: ['manager', 'operator', 'accountant'], // All roles
+    roles: ['manager', 'operator', 'accountant'],
   },
   {
     path: '/shipments/daily',
@@ -23,7 +24,7 @@ const NAV_ITEMS = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
       </svg>
     ),
-    roles: ['manager', 'operator'], // Not accountant
+    roles: ['manager', 'operator'],
   },
   {
     path: '/export',
@@ -33,7 +34,7 @@ const NAV_ITEMS = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
     ),
-    roles: ['manager', 'accountant'], // Manager and Accountant
+    roles: ['manager', 'operator', 'accountant'],
   },
   {
     path: '/reports',
@@ -55,7 +56,7 @@ const NAV_ITEMS = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
       </svg>
     ),
-    roles: ['manager'], // Manager only
+    roles: ['manager'],
     comingSoon: true,
   },
 ];
@@ -76,22 +77,28 @@ const ROLE_COLORS: Record<string, string> = {
 // ============================================
 // SIDEBAR COMPONENT
 // ============================================
-interface SidebarProps {
-  userName?: string;
-  userRole?: 'manager' | 'operator' | 'accountant';
-}
-
-const Sidebar: React.FC<SidebarProps> = ({ 
-  userName = 'مستخدم', 
-  userRole = 'operator' 
-}) => {
-  const navigate = useNavigate();
-  const { logout } = useAuth();
+const Sidebar: React.FC = () => {
+  const { user, logout } = useAuth();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
+  // Get user info from context
+  const userName = user?.name || 'مستخدم';
+  const userRole = user?.role || 'operator';
+
+  // ============================================
+  // LOGOUT HANDLER - Forces full page reload
+  // ============================================
   const handleLogout = () => {
+    // First clear the auth state
     logout();
-    navigate('/');
+    
+    // Clear any additional storage
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_data');
+    
+    // Force a complete page reload to login
+    // This ensures ALL React state is cleared
+    window.location.replace('/');
   };
 
   const closeMobile = () => setIsMobileOpen(false);

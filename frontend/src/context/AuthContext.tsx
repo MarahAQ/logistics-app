@@ -35,31 +35,38 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Load from localStorage on mount
   useEffect(() => {
-    const storedToken = localStorage.getItem('auth_token');
-    const storedUser = localStorage.getItem('user_data');
+    try {
+      const storedToken = localStorage.getItem('auth_token');
+      const storedUser = localStorage.getItem('user_data');
 
-    if (storedToken && storedUser) {
-      try {
+      if (storedToken && storedUser) {
+        const parsedUser = JSON.parse(storedUser);
         setToken(storedToken);
-        setUser(JSON.parse(storedUser));
-      } catch {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user_data');
+        setUser(parsedUser);
       }
+    } catch (error) {
+      // Clear corrupted data
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user_data');
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
   const login = (newToken: string, newUser: User) => {
+    // Save to localStorage
     localStorage.setItem('auth_token', newToken);
     localStorage.setItem('user_data', JSON.stringify(newUser));
+    // Update state
     setToken(newToken);
     setUser(newUser);
   };
 
   const logout = () => {
+    // Clear localStorage
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user_data');
+    // Clear state
     setToken(null);
     setUser(null);
   };
