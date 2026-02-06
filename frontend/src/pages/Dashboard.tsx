@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Shipment } from '../types/shipment';
+import ShipmentViewModal from '../components/ShipmentViewModal';
 
 const API_BASE = 'http://localhost:5001';
 
@@ -58,6 +59,9 @@ const Dashboard: React.FC = () => {
   // Status map
   const [statusMapState, setStatusMapState] = useState<Record<string, ShipmentStatus>>(() => getStatusMap());
 
+  // 🆕 View Modal state
+  const [viewingShipment, setViewingShipment] = useState<Shipment | null>(null);
+
   // ============================================
   // FETCH DATA
   // ============================================
@@ -106,6 +110,17 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // 🆕 Open view modal
+  const handleRowClick = (shipment: Shipment) => {
+    setViewingShipment(shipment);
+  };
+
+  // 🆕 View from menu
+  const handleViewFromMenu = (shipment: Shipment) => {
+    setOpenMenuId(null);
+    setViewingShipment(shipment);
+  };
+
   const getShipmentStatus = (shipmentId: number): ShipmentStatus => {
     return statusMapState[String(shipmentId)] || 'open';
   };
@@ -146,6 +161,7 @@ const Dashboard: React.FC = () => {
   // Stats
   const importCount = shipments.filter((s) => s.process_type === 'import').length;
   const exportCount = shipments.filter((s) => s.process_type === 'export').length;
+
   // ============================================
   // LOADING STATE
   // ============================================
@@ -281,7 +297,11 @@ const Dashboard: React.FC = () => {
                 const statusOption = STATUS_OPTIONS.find((s) => s.value === statusValue) || STATUS_OPTIONS[0];
 
                 return (
-                  <tr key={shipment.id} className="hover:bg-gray-50 transition-colors">
+                  <tr 
+                    key={shipment.id} 
+                    className="hover:bg-sky-50/50 transition-colors cursor-pointer"
+                    onClick={() => handleRowClick(shipment)}
+                  >
                     <td className="px-4 py-3 text-sm font-medium text-gray-700">
                       {shipment.reference_number || shipment.permit_number || '-'}
                     </td>
@@ -291,11 +311,12 @@ const Dashboard: React.FC = () => {
                         ? 'bg-green-100 text-green-700'
                         : 'bg-orange-100 text-orange-700'
                         }`}>
-                        {shipment.process_type}
+                        {shipment.process_type === 'import' ? 'استيراد' : 'تصدير'}
                       </span>
                     </td>
 
-                    <td className="px-4 py-3 text-sm">
+                    {/* Status dropdown - stop propagation */}
+                    <td className="px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
                       <select
                         value={statusValue}
                         onChange={(e) => updateShipmentStatus(shipment.id, e.target.value as ShipmentStatus)}
@@ -327,8 +348,12 @@ const Dashboard: React.FC = () => {
                         : formatDate(shipment.movement_date)}
                     </td>
 
-                    {/* Actions Menu */}
-                    <td className="px-4 py-3 text-sm relative" ref={openMenuId === shipment.id ? menuRef : null}>
+                    {/* Actions Menu - stop propagation */}
+                    <td 
+                      className="px-4 py-3 text-sm relative" 
+                      ref={openMenuId === shipment.id ? menuRef : null}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <button
                         onClick={() => setOpenMenuId(openMenuId === shipment.id ? null : shipment.id)}
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -340,6 +365,14 @@ const Dashboard: React.FC = () => {
 
                       {openMenuId === shipment.id && (
                         <div className="absolute left-0 mt-1 w-36 bg-white rounded-xl shadow-lg border border-gray-100 z-20 overflow-hidden">
+                          {/* 🆕 View Option */}
+                          <button
+                            onClick={() => handleViewFromMenu(shipment)}
+                            className="w-full text-right px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                          >
+                            👁️ عرض
+                          </button>
+                          {/* Edit Option */}
                           <Link
                             to={`/shipments/edit/${shipment.id}`}
                             className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
@@ -347,6 +380,7 @@ const Dashboard: React.FC = () => {
                           >
                             ✏️ تعديل
                           </Link>
+                          {/* Delete Option */}
                           <button
                             onClick={() => handleDelete(shipment.id)}
                             className="w-full text-right px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
@@ -383,6 +417,14 @@ const Dashboard: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* 🆕 View Modal */}
+      {viewingShipment && (
+        <ShipmentViewModal
+          shipment={viewingShipment}
+          onClose={() => setViewingShipment(null)}
+        />
+      )}
     </div>
   );
 };

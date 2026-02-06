@@ -221,7 +221,7 @@ const EnhancedShipmentForm: React.FC = () => {
   }, [id]);
 
   // ============================================
-  // VALIDATION HELPERS
+  // VALIDATION HELPERSs
   // ============================================
   const validateShippingLine = (value: string): boolean => /^[A-Z]{3}$/.test(value);
   const validateContainerNumber = (value: string): boolean => /^[A-Z]{4}[0-9]{7}$/.test(value);
