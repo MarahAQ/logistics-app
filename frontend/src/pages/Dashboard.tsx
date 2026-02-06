@@ -48,7 +48,7 @@ const Dashboard: React.FC = () => {
 
   // UI State
   const [search, setSearch] = useState('');
-  const [filterMovement, setFilterMovement] = useState<'all' | 'استيراد' | 'تصدير'>('all');
+  const [filterProcess, setFilterProcess] = useState<'all' | 'import' | 'export'>('all');
   const [visibleCount, setVisibleCount] = useState(15);
 
   // Menu state
@@ -123,7 +123,7 @@ const Dashboard: React.FC = () => {
 
   const filteredShipments = useMemo(() => {
     return shipments.filter((s) => {
-      if (filterMovement !== 'all' && s.movement_type !== filterMovement) return false;
+      if (filterProcess !== 'all' && s.process_type !== filterProcess) return false;
 
       if (search.trim()) {
         const haystack = [
@@ -139,14 +139,13 @@ const Dashboard: React.FC = () => {
 
       return true;
     });
-  }, [shipments, filterMovement, search]);
+  }, [shipments, filterProcess, search]);
 
   const visibleShipments = useMemo(() => filteredShipments.slice(0, visibleCount), [filteredShipments, visibleCount]);
 
   // Stats
-  const importCount = shipments.filter((s) => s.movement_type === 'استيراد').length;
-  const exportCount = shipments.filter((s) => s.movement_type === 'تصدير').length;
-
+  const importCount = shipments.filter((s) => s.process_type === 'import').length;
+  const exportCount = shipments.filter((s) => s.process_type === 'export').length;
   // ============================================
   // LOADING STATE
   // ============================================
@@ -240,16 +239,16 @@ const Dashboard: React.FC = () => {
 
           {/* Filter by type */}
           <select
-            value={filterMovement}
+            value={filterProcess}
             onChange={(e) => {
-              setFilterMovement(e.target.value as any);
+              setFilterProcess(e.target.value as any);
               setVisibleCount(15);
             }}
             className="px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500 min-w-[150px]"
           >
             <option value="all">جميع العمليات</option>
-            <option value="استيراد">استيراد فقط</option>
-            <option value="تصدير">تصدير فقط</option>
+            <option value="import">استيراد فقط</option>
+            <option value="export">تصدير فقط</option>
           </select>
 
           {/* Results count */}
@@ -288,12 +287,11 @@ const Dashboard: React.FC = () => {
                     </td>
 
                     <td className="px-4 py-3 text-sm">
-                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${
-                        shipment.movement_type === 'استيراد' 
-                          ? 'bg-green-100 text-green-700' 
-                          : 'bg-orange-100 text-orange-700'
-                      }`}>
-                        {shipment.movement_type}
+                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${shipment.process_type === 'import'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-orange-100 text-orange-700'
+                        }`}>
+                        {shipment.process_type}
                       </span>
                     </td>
 
@@ -318,13 +316,13 @@ const Dashboard: React.FC = () => {
                     </td>
 
                     <td className="px-4 py-3 text-sm text-gray-500">
-                      {shipment.movement_type === 'استيراد'
+                      {shipment.process_type === 'import'
                         ? shipment.delivery_location || '-'
                         : shipment.loading_location || '-'}
                     </td>
 
                     <td className="px-4 py-3 text-sm text-gray-500">
-                      {shipment.movement_type === 'استيراد'
+                      {shipment.process_type === 'import'
                         ? formatDate(shipment.delivery_date)
                         : formatDate(shipment.movement_date)}
                     </td>

@@ -1,373 +1,389 @@
 import React, { useState, useEffect } from 'react';
-import { Shipment } from '../types/shipment';
+import { useAuth } from '../context/AuthContext';
 
 const API_BASE = 'http://localhost:5001';
 
 // ============================================
-// HELPER FUNCTIONS
-// ============================================
-const formatDate = (value?: string | null) => {
-  if (!value) return '-';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '-';
-  return d.toLocaleDateString('ar-EG');
-};
-
-const csvEscape = (v: any) => {
-  const s = String(v ?? '');
-  return `"${s.replace(/"/g, '""')}"`;
-};
-
-const downloadCSV = (filename: string, rows: Record<string, any>[]) => {
-  if (!rows.length) return;
-  const headers = Object.keys(rows[0]);
-  const csvLines = [
-    headers.join(','),
-    ...rows.map((r) => headers.map((h) => csvEscape(r[h])).join(',')),
-  ];
-  const csv = csvLines.join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-};
-
-// ============================================
-// EXPORT PAGE COMPONENT
+// EXPORT PAGE - With Preview Table
+// Filters use: process_type, movement_date
 // ============================================
 const ExportPage: React.FC = () => {
-  // Data
-  const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { token } = useAuth();
 
-  // Filters
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [movementType, setMovementType] = useState<'all' | 'استيراد' | 'تصدير'>('all');
-  const [clientFilter, setClientFilter] = useState('');
+  // Filter state
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [movementType, setMovementType] = useState('all');
+  const [clientName, setClientName] = useState('');
 
-  // Export options
-  const [includeAll, setIncludeAll] = useState(true);
+  // Data state
+  const [shipments, setShipments] = useState<any[]>([]);
+  const [filteredShipments, setFilteredShipments] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
-  // Fetch shipments
+  // ============================================
+  // FETCH ALL SHIPMENTS
+  // ============================================
   useEffect(() => {
-    const fetchShipments = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/api/shipments`);
-        if (!response.ok) throw new Error('Failed to fetch');
-        const data = await response.json();
-        setShipments(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error('Error:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchShipments();
   }, []);
 
-  // Filter shipments
-  const filteredShipments = shipments.filter((s) => {
-    // Movement type filter
-    if (movementType !== 'all' && s.movement_type !== movementType) return false;
+  const fetchShipments = async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+      const response = await fetch(`${API_BASE}/api/shipments`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-    // Client filter
-    if (clientFilter.trim()) {
-      const client = (s.client_name || '').toLowerCase();
-      if (!client.includes(clientFilter.toLowerCase().trim())) return false;
+      if (!response.ok) throw new Error('فشل في جلب البيانات');
+
+      const data = await response.json();
+      setShipments(data);
+      setFilteredShipments(data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ============================================
+  // FILTER SHIPMENTS (Frontend preview)
+  // Uses: process_type, movement_date
+  // ============================================
+  useEffect(() => {
+    let filtered = [...shipments];
+
+    // Date filter - use movement_date
+    if (startDate) {
+      filtered = filtered.filter(s => {
+        if (!s.movement_date) return false;
+        return s.movement_date >= startDate;
+      });
     }
 
-    // Date range filter
-    if (dateFrom) {
-      const shipmentDate = new Date(s.movement_date || s.created_at || '');
-      const fromDate = new Date(dateFrom);
-      if (shipmentDate < fromDate) return false;
+    if (endDate) {
+      filtered = filtered.filter(s => {
+        if (!s.movement_date) return false;
+        return s.movement_date <= endDate;
+      });
     }
 
-    if (dateTo) {
-      const shipmentDate = new Date(s.movement_date || s.created_at || '');
-      const toDate = new Date(dateTo);
-      toDate.setHours(23, 59, 59, 999);
-      if (shipmentDate > toDate) return false;
+    // Movement type filter - use process_type (English values)
+    if (movementType !== 'all') {
+      filtered = filtered.filter(s => s.process_type === movementType);
     }
 
-    return true;
-  });
+    // Client name filter
+    if (clientName) {
+      filtered = filtered.filter(s => 
+        s.client_name?.toLowerCase().includes(clientName.toLowerCase())
+      );
+    }
 
-  // Export handler
-  const handleExport = () => {
-    if (!filteredShipments.length) {
-      alert('لا توجد بيانات للتصدير بناءً على الفلاتر المحددة');
+    setFilteredShipments(filtered);
+  }, [shipments, startDate, endDate, movementType, clientName]);
+
+  // ============================================
+  // EXPORT TO XLSX
+  // ============================================
+  const handleExport = async () => {
+    if (filteredShipments.length === 0) {
+      setError('لا توجد شحنات للتصدير');
       return;
     }
 
-    const rows = filteredShipments.map((s) => {
-      if (includeAll) {
-        // Export ALL columns
-        return {
-          'رقم المرجع': s.reference_number || s.permit_number || '',
-          'نوع العملية': s.movement_type || '',
-          'نوع الشحن': s.freight_type || '',
-          'اسم العميل': s.client_name || '',
-          'شركة التخليص': s.clearance_company || '',
-          'مسرب الحاوية': s.container_leak_status || '',
-          'رقم التصريح الجمركي': s.customs_permit_number || '',
-          'وصف البضاعة': s.goods_description || '',
-          'حجم الحاوية': s.container_size || '',
-          'رقم الحاوية': s.container_number || '',
-          'وزن الحاوية': s.container_weight ?? '',
-          'الخط الملاحي': s.shipping_line || '',
-          'رقم البوليصة': s.bill_of_lading_number || '',
-          'اسم السائق': s.driver_name || '',
-          'رقم هاتف السائق': s.driver_phone || '',
-          'رقم القاطرة': s.tractor_number || '',
-          'رقم المقطورة': s.trailer_number || '',
-          'موقع التسليم': s.delivery_location || '',
-          'موقع التحميل': s.loading_location || '',
-          'تاريخ التسليم': formatDate(s.delivery_date),
-          'مسؤول المستودع': s.warehouse_manager || '',
-          'رقم هاتف المسؤول': s.warehouse_manager_phone || '',
-          'ساعات العمل': s.warehouse_working_hours || '',
-          'ملاحظات': s.notes || '',
-          'تاريخ الإنشاء': formatDate(s.created_at),
-        };
-      } else {
-        // Export basic columns only
-        return {
-          'رقم المرجع': s.reference_number || s.permit_number || '',
-          'نوع العملية': s.movement_type || '',
-          'اسم العميل': s.client_name || '',
-          'رقم الحاوية': s.container_number || '',
-          'وزن الحاوية': s.container_weight ?? '',
-          'الموقع': s.delivery_location || s.loading_location || '',
-          'التاريخ': formatDate(s.delivery_date || s.movement_date),
-        };
+    setIsExporting(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const params = new URLSearchParams();
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      if (movementType !== 'all') params.append('movementType', movementType);
+      if (clientName) params.append('clientName', clientName);
+
+      const response = await fetch(`${API_BASE}/api/export/xlsx?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('فشل في تصدير البيانات');
       }
-    });
 
-    const dateStr = new Date().toISOString().slice(0, 10);
-    const filename = `shipments_export_${dateStr}.csv`;
-    downloadCSV(filename, rows);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      const today = new Date().toISOString().split('T')[0];
+      link.download = `شحنات_أريحا_${today}.xlsx`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
 
-    alert(`تم تصدير ${rows.length} شحنة بنجاح!`);
+      setSuccess('تم تصدير الملف بنجاح!');
+
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
-  // Reset filters
+  // ============================================
+  // RESET FILTERS
+  // ============================================
   const resetFilters = () => {
-    setDateFrom('');
-    setDateTo('');
+    setStartDate('');
+    setEndDate('');
     setMovementType('all');
-    setClientFilter('');
+    setClientName('');
+    setError('');
+    setSuccess('');
   };
 
-  if (loading) {
-    return (
-      <div className="p-8 flex items-center justify-center min-h-screen">
-        <div className="text-gray-500">جاري تحميل البيانات...</div>
-      </div>
-    );
-  }
+  // ============================================
+  // FORMAT DATE FOR DISPLAY
+  // ============================================
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '-';
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('ar-EG');
+    } catch {
+      return dateStr;
+    }
+  };
 
+  // ============================================
+  // TRANSLATE PROCESS TYPE
+  // ============================================
+  const translateProcessType = (type: string) => {
+    const translations: Record<string, string> = {
+      'import': 'استيراد',
+      'export': 'تصدير',
+    };
+    return translations[type] || type || '-';
+  };
+
+  // ============================================
+  // RENDER
+  // ============================================
   return (
-    <div className="p-6 lg:p-8">
-      {/* Page Header */}
-      <div className="mb-8">
+    <div className="p-6" dir="rtl">
+      {/* Header */}
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800">تصدير البيانات</h1>
-        <p className="text-gray-500 mt-1">اختر الفلاتر المناسبة ثم قم بتصدير البيانات إلى Excel</p>
+        <p className="text-gray-500 mt-1">تصدير الشحنات إلى ملف Excel</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Filters Card */}
-        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg>
-            فلاتر التصدير
-          </h2>
+      {/* Messages */}
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl text-green-600">
+          {success}
+        </div>
+      )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Date From */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">من تاريخ</label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all"
-              />
-            </div>
-
-            {/* Date To */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">إلى تاريخ</label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all"
-              />
-            </div>
-
-            {/* Movement Type */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">نوع العملية</label>
-              <select
-                value={movementType}
-                onChange={(e) => setMovementType(e.target.value as any)}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all"
-              >
-                <option value="all">الكل</option>
-                <option value="استيراد">استيراد فقط</option>
-                <option value="تصدير">تصدير فقط</option>
-              </select>
-            </div>
-
-            {/* Client Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">اسم العميل</label>
-              <input
-                type="text"
-                value={clientFilter}
-                onChange={(e) => setClientFilter(e.target.value)}
-                placeholder="ابحث باسم العميل..."
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all"
-              />
-            </div>
+      {/* Filters Card */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+        <h2 className="text-lg font-semibold text-gray-800 mb-4">تصفية البيانات</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Start Date */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">من تاريخ</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+            />
           </div>
 
-          {/* Export Options */}
-          <div className="mt-6 pt-6 border-t border-gray-100">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">خيارات التصدير</h3>
-            <div className="flex flex-col gap-3">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="radio"
-                  checked={includeAll}
-                  onChange={() => setIncludeAll(true)}
-                  className="w-4 h-4 text-sky-600"
-                />
-                <span className="text-sm text-gray-700">تصدير جميع الأعمدة (25 عمود)</span>
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="radio"
-                  checked={!includeAll}
-                  onChange={() => setIncludeAll(false)}
-                  className="w-4 h-4 text-sky-600"
-                />
-                <span className="text-sm text-gray-700">تصدير الأعمدة الأساسية فقط (7 أعمدة)</span>
-              </label>
-            </div>
+          {/* End Date */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">إلى تاريخ</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+            />
           </div>
 
-          {/* Actions */}
-          <div className="mt-6 flex gap-3">
-            <button
-              onClick={resetFilters}
-              className="px-4 py-2.5 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors text-sm"
+          {/* Movement Type - sends English values */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">نوع العملية</label>
+            <select
+              value={movementType}
+              onChange={(e) => setMovementType(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
             >
-              مسح الفلاتر
-            </button>
+              <option value="all">الكل</option>
+              <option value="import">استيراد</option>
+              <option value="export">تصدير</option>
+            </select>
+          </div>
+
+          {/* Client Name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">اسم العميل</label>
+            <input
+              type="text"
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              placeholder="البحث باسم العميل..."
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+            />
           </div>
         </div>
 
-        {/* Export Summary Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">ملخص التصدير</h2>
-          
+        {/* Reset Button */}
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={resetFilters}
+            className="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            إعادة تعيين الفلاتر
+          </button>
+        </div>
+      </div>
+
+      {/* Stats & Export Button */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           {/* Stats */}
-          <div className="space-y-4 mb-6">
-            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
-              <span className="text-gray-600 text-sm">إجمالي الشحنات</span>
-              <span className="font-bold text-gray-800">{shipments.length}</span>
+          <div className="flex items-center gap-8">
+            <div className="text-center">
+              <p className="text-3xl font-bold text-gray-400">{shipments.length}</p>
+              <p className="text-sm text-gray-500">إجمالي الشحنات</p>
             </div>
-            <div className="flex justify-between items-center p-3 bg-sky-50 rounded-xl">
-              <span className="text-sky-600 text-sm">سيتم تصديرها</span>
-              <span className="font-bold text-sky-600">{filteredShipments.length}</span>
-            </div>
-            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
-              <span className="text-gray-600 text-sm">عدد الأعمدة</span>
-              <span className="font-bold text-gray-800">{includeAll ? 25 : 7}</span>
+            <div className="h-12 w-px bg-gray-200"></div>
+            <div className="text-center">
+              <p className="text-3xl font-bold text-sky-600">{filteredShipments.length}</p>
+              <p className="text-sm text-gray-500">سيتم تصديرها</p>
             </div>
           </div>
 
           {/* Export Button */}
           <button
             onClick={handleExport}
-            disabled={filteredShipments.length === 0}
-            className={`w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${
-              filteredShipments.length > 0
-                ? 'bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/30'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            disabled={isExporting || filteredShipments.length === 0}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${
+              isExporting || filteredShipments.length === 0
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : 'bg-green-600 text-white hover:bg-green-700 shadow-lg'
             }`}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <span>تصدير إلى Excel</span>
+            {isExporting ? (
+              <>
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <span>جاري التصدير...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>تصدير Excel</span>
+              </>
+            )}
           </button>
-
-          {filteredShipments.length === 0 && (
-            <p className="text-center text-sm text-gray-400 mt-3">
-              لا توجد شحنات مطابقة للفلاتر
-            </p>
-          )}
         </div>
       </div>
 
       {/* Preview Table */}
-      <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-800">معاينة البيانات ({filteredShipments.length} شحنة)</h2>
+          <h2 className="text-lg font-semibold text-gray-800">معاينة البيانات</h2>
+          <p className="text-sm text-gray-500">أول 10 شحنات من النتائج</p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">رقم المرجع</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">نوع العملية</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">العميل</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">رقم الحاوية</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">التاريخ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredShipments.slice(0, 10).map((s) => (
-                <tr key={s.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm text-gray-700">{s.reference_number || s.permit_number || '-'}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      s.movement_type === 'استيراد' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
-                    }`}>
-                      {s.movement_type}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{s.client_name || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500 font-mono">{s.container_number || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{formatDate(s.delivery_date || s.movement_date)}</td>
-                </tr>
-              ))}
-              {filteredShipments.length === 0 && (
+
+        {isLoading ? (
+          <div className="p-8 text-center">
+            <div className="w-8 h-8 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <p className="text-gray-500 mt-3">جاري التحميل...</p>
+          </div>
+        ) : filteredShipments.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">
+            <svg className="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <p>لا توجد شحنات مطابقة للفلاتر</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
-                    لا توجد شحنات مطابقة للفلاتر
-                  </td>
+                  <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">تاريخ اليوم</th>
+                  <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">رقم المرجع</th>
+                  <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">نوع العملية</th>
+                  <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">اسم العميل</th>
+                  <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">رقم الحاوية</th>
+                  <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">موقع التسليم</th>
                 </tr>
-              )}
-              {filteredShipments.length > 10 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-3 text-center text-gray-400 text-sm">
-                    ... و {filteredShipments.length - 10} شحنة أخرى
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredShipments.slice(0, 10).map((shipment, index) => (
+                  <tr key={shipment.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="px-4 py-3 text-sm text-gray-800">
+                      {formatDate(shipment.movement_date)}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-800 font-mono">
+                      {shipment.reference_number || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                        shipment.process_type === 'import' 
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-green-100 text-green-700'
+                      }`}>
+                        {translateProcessType(shipment.process_type)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-800">
+                      {shipment.client_name || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 font-mono">
+                      {shipment.container_number || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {shipment.delivery_location || '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Show more indicator */}
+        {filteredShipments.length > 10 && (
+          <div className="p-4 border-t border-gray-100 text-center text-sm text-gray-500">
+            +{filteredShipments.length - 10} شحنات أخرى...
+          </div>
+        )}
       </div>
     </div>
   );

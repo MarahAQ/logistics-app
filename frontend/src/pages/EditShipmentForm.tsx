@@ -17,9 +17,8 @@ const EditShipmentForm: React.FC = () => {
   // ===========================
   const [formData, setFormData] = useState<ShipmentFormData>({
     movement_date: '',
-    movement_type: 'استيراد',
     freight_type: '',
-    process_type: 'استيراد',
+    process_type: 'import',
     client_name: '',
     clearance_company: '',
     customs_agent: '',
@@ -120,9 +119,8 @@ const EditShipmentForm: React.FC = () => {
 
       setFormData({
         movement_date: normalizeDateToYYYYMMDD(data.movement_date),
-        movement_type: data.movement_type || 'استيراد',
         freight_type: data.freight_type || '',
-        process_type: data.process_type || data.movement_type || 'استيراد',
+        process_type: data.process_type || 'import',
         client_name: data.client_name || '',
         clearance_company: data.clearance_company || '',
         customs_agent: data.customs_agent || '',
@@ -315,15 +313,14 @@ const EditShipmentForm: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
                     نوع الحركة *
                   </label>
-                  <select
-                    name="movement_type"
-                    value={formData.movement_type}
+                  <select name="process_type"
+                    value={formData.process_type}
                     onChange={handleChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   >
-                    <option value="استيراد">استيراد</option>
-                    <option value="تصدير">تصدير</option>
+                    <option value="import">استيراد</option>
+                    <option value="export">تصدير</option>
                   </select>
                 </div>
 
@@ -662,7 +659,7 @@ const EditShipmentForm: React.FC = () => {
               <h2 className="text-xl font-semibold text-gray-800 mb-4">معلومات الموقع والتسليم</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Delivery Location (Import) */}
-                {formData.movement_type === 'استيراد' && (
+                {formData.process_type === 'import' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
                       موقع التسليم *
@@ -673,13 +670,13 @@ const EditShipmentForm: React.FC = () => {
                       value={formData.delivery_location}
                       onChange={handleChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required={formData.movement_type === 'استيراد'}
+                      required={formData.process_type === 'import'}
                     />
                   </div>
                 )}
 
                 {/* Loading Location (Export) */}
-                {formData.movement_type === 'تصدير' && (
+                {formData.process_type === 'export' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
                       موقع التحميل *
@@ -690,7 +687,7 @@ const EditShipmentForm: React.FC = () => {
                       value={formData.loading_location}
                       onChange={handleChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required={formData.movement_type === 'تصدير'}
+                      required={formData.process_type === 'export'}
                     />
                   </div>
                 )}
@@ -875,20 +872,18 @@ const EditShipmentForm: React.FC = () => {
                 type="button"
                 onClick={() => navigate('/dashboard')}
                 disabled={isSubmitting}
-                className={`bg-gray-300 text-gray-700 px-6 py-2 rounded-md transition duration-200 ${
-                  isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-400'
-                }`}
+                className={`bg-gray-300 text-gray-700 px-6 py-2 rounded-md transition duration-200 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-400'
+                  }`}
               >
                 إلغاء
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className={`px-6 py-2 rounded-md transition duration-200 ${
-                  isSubmitting
-                    ? 'bg-gray-400 cursor-not-allowed text-white'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                }`}
+                className={`px-6 py-2 rounded-md transition duration-200 ${isSubmitting
+                  ? 'bg-gray-400 cursor-not-allowed text-white'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
               >
                 {isSubmitting ? 'جاري التحديث...' : 'تحديث الشحنة'}
               </button>

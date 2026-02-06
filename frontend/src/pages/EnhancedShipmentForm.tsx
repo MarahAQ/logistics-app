@@ -8,8 +8,8 @@ import AutoSuggestInput from '../components/AutoSuggestInput';
 // ============================================
 const initialFormData: ShipmentFormData = {
   movement_date: '',
-  movement_type: 'استيراد',
-  freight_type: '',
+  movement_type: '',
+  freight_type: 'TRK',
   client_name: '',
   driver_name: '',
   invoice_number: '',
@@ -31,7 +31,7 @@ const initialFormData: ShipmentFormData = {
   loading_location: '',
   warehouse_manager: '',
   warehouse_manager_phone: '',
-  process_type: 'استيراد',
+  process_type: 'import',
   notes: '',
   working_schedule: {
     type: 'preset',
@@ -72,13 +72,12 @@ const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({ currentSection, c
             {/* Circle */}
             <div className="flex flex-col items-center">
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold transition-all duration-300 ${
-                  completedSections.includes(section.id)
-                    ? 'bg-green-500 text-white'
-                    : currentSection === section.id
+                className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold transition-all duration-300 ${completedSections.includes(section.id)
+                  ? 'bg-green-500 text-white'
+                  : currentSection === section.id
                     ? 'bg-blue-500 text-white ring-4 ring-blue-200'
                     : 'bg-gray-200 text-gray-500'
-                }`}
+                  }`}
               >
                 {completedSections.includes(section.id) ? '✓' : section.id}
               </div>
@@ -87,9 +86,8 @@ const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({ currentSection, c
             {/* Connector Line */}
             {index < SECTIONS.length - 1 && (
               <div
-                className={`flex-1 h-1 mx-2 rounded transition-all duration-300 ${
-                  completedSections.includes(section.id) ? 'bg-green-500' : 'bg-gray-200'
-                }`}
+                className={`flex-1 h-1 mx-2 rounded transition-all duration-300 ${completedSections.includes(section.id) ? 'bg-green-500' : 'bg-gray-200'
+                  }`}
               />
             )}
           </React.Fragment>
@@ -128,35 +126,32 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({
       type="button"
       onClick={onClick}
       disabled={isLocked}
-      className={`w-full p-4 rounded-lg border-2 transition-all duration-300 text-right ${
-        isActive
-          ? 'border-blue-500 bg-blue-50'
-          : isCompleted
+      className={`w-full p-4 rounded-lg border-2 transition-all duration-300 text-right ${isActive
+        ? 'border-blue-500 bg-blue-50'
+        : isCompleted
           ? 'border-green-500 bg-green-50 hover:bg-green-100'
           : isLocked
-          ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
-          : 'border-gray-300 bg-white hover:border-gray-400'
-      }`}
+            ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+            : 'border-gray-300 bg-white hover:border-gray-400'
+        }`}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {/* Status Icon */}
           <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center ${
-              isCompleted
-                ? 'bg-green-500 text-white'
-                : isActive
+            className={`w-8 h-8 rounded-full flex items-center justify-center ${isCompleted
+              ? 'bg-green-500 text-white'
+              : isActive
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-300 text-gray-600'
-            }`}
+              }`}
           >
             {isCompleted ? '✓' : isLocked ? '🔒' : section.id}
           </div>
           {/* Arrow */}
           <svg
-            className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'rotate-90' : ''} ${
-              isLocked ? 'text-gray-400' : 'text-gray-600'
-            }`}
+            className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'rotate-90' : ''} ${isLocked ? 'text-gray-400' : 'text-gray-600'
+              }`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -236,8 +231,7 @@ const EnhancedShipmentForm: React.FC = () => {
   const isSectionComplete = (sectionId: number): boolean => {
     switch (sectionId) {
       case 1:
-        return !!(formData.movement_type && formData.movement_date && formData.freight_type);
-      case 2:
+        return !!(formData.process_type && formData.movement_date && formData.freight_type); case 2:
         return !!formData.client_name;
       case 3:
         return !!(formData.container_number && formData.shipping_line && formData.container_weight >= 2);
@@ -245,7 +239,7 @@ const EnhancedShipmentForm: React.FC = () => {
         return true; // Optional section
       case 5:
         return !!(
-          (formData.movement_type === 'استيراد' ? formData.delivery_location : formData.loading_location) &&
+          (formData.process_type === 'import' ? formData.delivery_location : formData.loading_location) &&
           formData.delivery_date &&
           formData.warehouse_manager
         );
@@ -268,7 +262,7 @@ const EnhancedShipmentForm: React.FC = () => {
       case 4:
         return formData.driver_name || 'لم يتم إدخال بيانات السائق';
       case 5:
-        const location = formData.movement_type === 'استيراد' ? formData.delivery_location : formData.loading_location;
+        const location = formData.process_type === 'import' ? formData.delivery_location : formData.loading_location;
         return `${location} | ${formData.delivery_date}`;
       case 6:
         return formData.notes ? formData.notes.substring(0, 50) + '...' : 'لا توجد ملاحظات';
@@ -352,7 +346,7 @@ const EnhancedShipmentForm: React.FC = () => {
     // Check required sections
     const requiredSections = [1, 2, 3, 5];
     const incompleteSections = requiredSections.filter((s) => !isSectionComplete(s));
-    
+
     if (incompleteSections.length > 0) {
       alert('يرجى إكمال جميع الأقسام المطلوبة');
       setActiveSection(incompleteSections[0]);
@@ -395,13 +389,13 @@ const EnhancedShipmentForm: React.FC = () => {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">نوع العملية *</label>
           <select
-            name="movement_type"
-            value={formData.movement_type}
+            name="process_type"
+            value={formData.process_type}
             onChange={handleChange}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
-            <option value="استيراد">استيراد</option>
-            <option value="تصدير">تصدير</option>
+            <option value="import">استيراد</option>
+            <option value="export">تصدير</option>
           </select>
         </div>
 
@@ -419,18 +413,13 @@ const EnhancedShipmentForm: React.FC = () => {
 
         {/* Freight Type */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">نوع الشحن *</label>
-          <select
-            name="freight_type"
-            value={formData.freight_type}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="">اختر النوع</option>
-            <option value="SEA">🚢 بحري (SEA)</option>
-            <option value="AIR">✈️ جوي (AIR)</option>
-            <option value="TRK">🚛 بري (TRK)</option>
-          </select>
+          <label className="block text-sm font-medium text-gray-700 mb-2">نوع الشحن</label>
+          <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg">
+            <span className="text-2xl">🚛</span>
+            <span className="font-medium text-gray-700">بري (شاحنة)</span>
+            <span className="text-xs bg-sky-100 text-sky-700 px-2 py-1 rounded-full mr-auto">TRK</span>
+          </div>
+          <input type="hidden" name="freight_type" value="TRK" />
         </div>
       </div>
 
@@ -440,11 +429,10 @@ const EnhancedShipmentForm: React.FC = () => {
           type="button"
           onClick={() => completeSection(1)}
           disabled={!isSectionComplete(1)}
-          className={`px-6 py-3 rounded-lg font-medium transition-all ${
-            isSectionComplete(1)
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
+          className={`px-6 py-3 rounded-lg font-medium transition-all ${isSectionComplete(1)
+            ? 'bg-blue-600 text-white hover:bg-blue-700'
+            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
         >
           متابعة ←
         </button>
@@ -538,11 +526,10 @@ const EnhancedShipmentForm: React.FC = () => {
           type="button"
           onClick={() => completeSection(2)}
           disabled={!isSectionComplete(2)}
-          className={`px-6 py-3 rounded-lg font-medium transition-all ${
-            isSectionComplete(2)
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
+          className={`px-6 py-3 rounded-lg font-medium transition-all ${isSectionComplete(2)
+            ? 'bg-blue-600 text-white hover:bg-blue-700'
+            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
         >
           متابعة ←
         </button>
@@ -636,11 +623,10 @@ const EnhancedShipmentForm: React.FC = () => {
           type="button"
           onClick={() => completeSection(3)}
           disabled={!isSectionComplete(3)}
-          className={`px-6 py-3 rounded-lg font-medium transition-all ${
-            isSectionComplete(3)
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
+          className={`px-6 py-3 rounded-lg font-medium transition-all ${isSectionComplete(3)
+            ? 'bg-blue-600 text-white hover:bg-blue-700'
+            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
         >
           متابعة ←
         </button>
@@ -722,14 +708,14 @@ const EnhancedShipmentForm: React.FC = () => {
         {/* Delivery/Loading Location */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            {formData.movement_type === 'استيراد' ? 'موقع التسليم' : 'موقع التحميل'} *
+            {formData.process_type === 'import' ? 'موقع التسليم' : 'موقع التحميل'} *
           </label>
           <input
             type="text"
-            name={formData.movement_type === 'استيراد' ? 'delivery_location' : 'loading_location'}
-            value={formData.movement_type === 'استيراد' ? formData.delivery_location : formData.loading_location}
+            name={formData.process_type === 'import' ? 'delivery_location' : 'loading_location'}
+            value={formData.process_type === 'import' ? formData.delivery_location : formData.loading_location}
             onChange={(e) => {
-              const field = formData.movement_type === 'استيراد' ? 'delivery_location' : 'loading_location';
+              const field = formData.process_type === 'import' ? 'delivery_location' : 'loading_location';
               setFormData({ ...formData, [field]: e.target.value });
             }}
             placeholder="عمان، الزرقاء، العقبة..."
@@ -740,7 +726,7 @@ const EnhancedShipmentForm: React.FC = () => {
         {/* Delivery/Loading Date */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            {formData.movement_type === 'استيراد' ? 'تاريخ التسليم' : 'تاريخ التحميل'} *
+            {formData.process_type === 'import' ? 'تاريخ التسليم' : 'تاريخ التحميل'} *
           </label>
           <input
             type="date"
@@ -869,11 +855,10 @@ const EnhancedShipmentForm: React.FC = () => {
           type="button"
           onClick={() => completeSection(5)}
           disabled={!isSectionComplete(5)}
-          className={`px-6 py-3 rounded-lg font-medium transition-all ${
-            isSectionComplete(5)
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
+          className={`px-6 py-3 rounded-lg font-medium transition-all ${isSectionComplete(5)
+            ? 'bg-blue-600 text-white hover:bg-blue-700'
+            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
         >
           متابعة ←
         </button>
@@ -908,11 +893,10 @@ const EnhancedShipmentForm: React.FC = () => {
           type="button"
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className={`px-8 py-3 rounded-lg font-medium transition-all ${
-            isSubmitting
-              ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-green-600 text-white hover:bg-green-700'
-          }`}
+          className={`px-8 py-3 rounded-lg font-medium transition-all ${isSubmitting
+            ? 'bg-gray-400 cursor-not-allowed'
+            : 'bg-green-600 text-white hover:bg-green-700'
+            }`}
         >
           {isSubmitting ? 'جاري الحفظ...' : '✓ حفظ الشحنة'}
         </button>
@@ -978,12 +962,11 @@ const EnhancedShipmentForm: React.FC = () => {
                   onClick={() => handleSectionClick(section.id)}
                   summary={isCompleted ? getSectionSummary(section.id) : undefined}
                 />
-                
+
                 {/* Section Content */}
                 <div
-                  className={`transition-all duration-300 ease-in-out ${
-                    isActive ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
-                  }`}
+                  className={`transition-all duration-300 ease-in-out ${isActive ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
+                    }`}
                 >
                   <div className="p-6 border-t border-gray-100">
                     {renderActiveSection()}
@@ -998,6 +981,5 @@ const EnhancedShipmentForm: React.FC = () => {
   );
 };
 
-// Export with the same name as your original file so routes don't break
 export default EnhancedShipmentForm;
 

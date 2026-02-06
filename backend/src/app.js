@@ -1,3 +1,4 @@
+const exportRoutes = require('../routes/export');
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
@@ -15,6 +16,7 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/shipments', shipmentRoutes);
+app.use('/api/export', exportRoutes);
 
 
 
