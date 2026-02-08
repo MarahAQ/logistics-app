@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Shipment } from '../types/shipment';
 import ShipmentViewModal from '../components/ShipmentViewModal';
+import ShipmentPrintView from '../components/ShipmentPrintView';
 
 const API_BASE = 'http://localhost:5001';
 
@@ -59,8 +60,11 @@ const Dashboard: React.FC = () => {
   // Status map
   const [statusMapState, setStatusMapState] = useState<Record<string, ShipmentStatus>>(() => getStatusMap());
 
-  // 🆕 View Modal state
+  // View Modal state
   const [viewingShipment, setViewingShipment] = useState<Shipment | null>(null);
+
+  // 🆕 Print View state
+  const [printingShipment, setPrintingShipment] = useState<Shipment | null>(null);
 
   // ============================================
   // FETCH DATA
@@ -110,15 +114,29 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // 🆕 Open view modal
+  // Open view modal
   const handleRowClick = (shipment: Shipment) => {
     setViewingShipment(shipment);
   };
 
-  // 🆕 View from menu
+  // View from menu
   const handleViewFromMenu = (shipment: Shipment) => {
     setOpenMenuId(null);
     setViewingShipment(shipment);
+  };
+
+  // 🆕 Print from menu
+  const handlePrintFromMenu = (shipment: Shipment) => {
+    setOpenMenuId(null);
+    setPrintingShipment(shipment);
+  };
+
+  // 🆕 Print from view modal
+  const handlePrintFromModal = () => {
+    if (viewingShipment) {
+      setViewingShipment(null); // Close view modal
+      setPrintingShipment(viewingShipment); // Open print view
+    }
   };
 
   const getShipmentStatus = (shipmentId: number): ShipmentStatus => {
@@ -365,12 +383,19 @@ const Dashboard: React.FC = () => {
 
                       {openMenuId === shipment.id && (
                         <div className="absolute left-0 mt-1 w-36 bg-white rounded-xl shadow-lg border border-gray-100 z-20 overflow-hidden">
-                          {/* 🆕 View Option */}
+                          {/* View Option */}
                           <button
                             onClick={() => handleViewFromMenu(shipment)}
                             className="w-full text-right px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                           >
                             👁️ عرض
+                          </button>
+                          {/* 🆕 Print Option */}
+                          <button
+                            onClick={() => handlePrintFromMenu(shipment)}
+                            className="w-full text-right px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                          >
+                            🖨️ طباعة
                           </button>
                           {/* Edit Option */}
                           <Link
@@ -418,11 +443,20 @@ const Dashboard: React.FC = () => {
         )}
       </div>
 
-      {/* 🆕 View Modal */}
+      {/* View Modal */}
       {viewingShipment && (
         <ShipmentViewModal
           shipment={viewingShipment}
           onClose={() => setViewingShipment(null)}
+          onPrint={handlePrintFromModal}
+        />
+      )}
+
+      {/* 🆕 Print View */}
+      {printingShipment && (
+        <ShipmentPrintView
+          shipment={printingShipment}
+          onClose={() => setPrintingShipment(null)}
         />
       )}
     </div>
