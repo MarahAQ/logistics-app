@@ -12,7 +12,6 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import EnhancedShipmentForm from './pages/EnhancedShipmentForm';
-import EditShipmentForm from './pages/EditShipmentForm';
 import ExportPage from './pages/ExportPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
@@ -52,7 +51,7 @@ function App() {
               path="/shipments/edit/:id" 
               element={
                 <ProtectedRoute allowedRoles={['manager', 'operator']}>
-                  <EditShipmentForm />
+                  <EnhancedShipmentForm />
                 </ProtectedRoute>
               } 
             />
