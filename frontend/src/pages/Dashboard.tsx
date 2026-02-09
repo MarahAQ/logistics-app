@@ -55,8 +55,7 @@ const Dashboard: React.FC = () => {
 
   // Menu state
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-
+  const menuRef = useRef<HTMLTableCellElement | null>(null);
   // Status map
   const [statusMapState, setStatusMapState] = useState<Record<string, ShipmentStatus>>(() => getStatusMap());
 
@@ -315,8 +314,8 @@ const Dashboard: React.FC = () => {
                 const statusOption = STATUS_OPTIONS.find((s) => s.value === statusValue) || STATUS_OPTIONS[0];
 
                 return (
-                  <tr 
-                    key={shipment.id} 
+                  <tr
+                    key={shipment.id}
                     className="hover:bg-sky-50/50 transition-colors cursor-pointer"
                     onClick={() => handleRowClick(shipment)}
                   >
@@ -367,8 +366,8 @@ const Dashboard: React.FC = () => {
                     </td>
 
                     {/* Actions Menu - stop propagation */}
-                    <td 
-                      className="px-4 py-3 text-sm relative" 
+                    <td
+                      className="px-4 py-3 text-sm relative"
                       ref={openMenuId === shipment.id ? menuRef : null}
                       onClick={(e) => e.stopPropagation()}
                     >

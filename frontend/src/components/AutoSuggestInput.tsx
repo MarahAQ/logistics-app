@@ -9,18 +9,17 @@ interface AutoSuggestInputProps {
   className?: string;
 }
 
-const AutoSuggestInput: React.FC<AutoSuggestInputProps> = ({ 
-  field, 
-  value, 
-  onChange, 
-  placeholder, 
-  className = '' 
+const AutoSuggestInput: React.FC<AutoSuggestInputProps> = ({
+  field,
+  value,
+  onChange,
+  placeholder,
+  className = ''
 }) => {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
+  const timeoutRef = useRef<number | null>(null);
   useEffect(() => {
     if (value && value.length > 1) {
       if (timeoutRef.current) {
@@ -43,7 +42,7 @@ const AutoSuggestInput: React.FC<AutoSuggestInputProps> = ({
 
   const fetchSuggestions = async (query: string) => {
     if (!query || query.length < 2) return;
-    
+
     setIsLoading(true);
     try {
       const response = await axios.get(`http://localhost:5001/api/shipments/suggestions/search`, {
@@ -79,7 +78,7 @@ const AutoSuggestInput: React.FC<AutoSuggestInputProps> = ({
         placeholder={placeholder}
         className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
       />
-      
+
       {isLoading && (
         <div className="absolute right-3 top-2">
           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>

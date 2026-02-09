@@ -2,10 +2,9 @@ const express = require('express');
 const pool = require('../config/database');
 const router = express.Router();
 
-/**
- * AUTO-SUGGESTIONS ROUTE
- * Must be BEFORE "/:id" or Express will treat "suggestions" as an id.
- */
+/* =========================================================
+   AUTO-SUGGESTIONS
+   ========================================================= */
 router.get('/suggestions/search', async (req, res) => {
   try {
     const { field, query } = req.query;
@@ -28,7 +27,8 @@ router.get('/suggestions/search', async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT DISTINCT ${field} FROM shipments
+      `SELECT DISTINCT ${field}
+       FROM shipments
        WHERE ${field} ILIKE $1
          AND ${field} IS NOT NULL
          AND ${field} != ''
@@ -37,151 +37,58 @@ router.get('/suggestions/search', async (req, res) => {
       [`%${query}%`]
     );
 
-    const suggestions = result.rows.map(row => row[field]);
-    res.json(suggestions);
+    res.json(result.rows.map(r => r[field]));
   } catch (error) {
     console.error('Suggestion error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// GET all shipments
+/* =========================================================
+   GET ALL
+   ========================================================= */
 router.get('/', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM shipments ORDER BY created_at DESC');
+    const result = await pool.query(
+      'SELECT * FROM shipments ORDER BY created_at DESC'
+    );
     res.json(result.rows);
   } catch (error) {
-    console.error('Error fetching shipments:', error);
+    console.error('Fetch shipments error:', error);
     res.status(500).json({ error: 'Failed to fetch shipments' });
   }
 });
 
-// GET single shipment by ID
+/* =========================================================
+   GET BY ID
+   ========================================================= */
 router.get('/:id', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM shipments WHERE id = $1', [req.params.id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Shipment not found' });
+    const result = await pool.query(
+      'SELECT * FROM shipments WHERE id = $1',
+      [req.params.id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('Error fetching shipment:', error);
+    console.error('Fetch shipment error:', error);
     res.status(500).json({ error: 'Failed to fetch shipment' });
   }
 });
 
-// CREATE new shipment
+/* =========================================================
+   CREATE (SINGLE SOURCE OF TRUTH)
+   ========================================================= */
 router.post('/', async (req, res) => {
   try {
     const {
       movement_date,
-      movement_type,   // 'استيراد' or 'تصدير'
-      freight_type,    // 'AIR', 'SEA', 'TRK'
-      customs_agent,
-      client_name,
-      permit_number,
-      driver_name,
-      container_number,
-      unloading_date,
-      delivery_date,
-      clearance_company,
-      container_leak_status,
-      container_leak_custom,
-      customs_permit_number,
-      goods_description,
-      container_size,
-      container_weight,
-      shipping_line,
-      bill_of_lading_number,
-      tractor_number,
-      trailer_number,
-      driver_phone,
-      delivery_location,
-      loading_location,               // NEW
-      warehouse_manager,
-      warehouse_manager_phone,
-      warehouse_working_hours,
-      notes
-    } = req.body;
-
-    // Derive normalized process_type
-    const process_type = movement_type === 'تصدير' ? 'export' : 'import';
-
-    // Convert empty dates to null
-    const processedMovementDate = movement_date || null;
-    const processedUnloadingDate = unloading_date || null;
-    const processedDeliveryDate = delivery_date || null;
-
-    // ======= Generate reference number =======
-    const freightCode = freight_type ? String(freight_type).toUpperCase() : 'TRK';
-    const movementCode = movement_type === 'تصدير' ? 'EXP' : 'IMP';
-    const year = new Date().getFullYear();
-
-    const countResult = await pool.query(
-      `SELECT COUNT(*) AS count
-       FROM shipments
-       WHERE freight_type = $1
-         AND movement_type = $2
-         AND EXTRACT(YEAR FROM created_at) = $3`,
-      [freightCode, movement_type, year]
-    );
-
-    const sequenceNumber = parseInt(countResult.rows[0].count, 10) + 1;
-    const paddedNumber = String(sequenceNumber).padStart(4, '0');
-    const reference_number = `${freightCode}-${movementCode}-${year}-${paddedNumber}`;
-
-    // ======= Insert shipment =======
-    const result = await pool.query(
-      `INSERT INTO shipments (
-        user_id, movement_date, movement_type, freight_type, reference_number,
-        customs_agent, client_name, permit_number, driver_name, container_number,
-        unloading_date, delivery_date,
-        clearance_company, container_leak_status, container_leak_custom,
-        customs_permit_number, goods_description, container_size,
-        container_weight, shipping_line, bill_of_lading_number,
-        tractor_number, trailer_number, driver_phone,
-        delivery_location, loading_location,
-        warehouse_manager, warehouse_manager_phone, warehouse_working_hours,
-        process_type, notes
-      ) VALUES (
-        $1,$2,$3,$4,$5,
-        $6,$7,$8,$9,$10,
-        $11,$12,
-        $13,$14,$15,
-        $16,$17,$18,
-        $19,$20,$21,
-        $22,$23,$24,
-        $25,$26,
-        $27,$28,$29,
-        $30,$31
-      ) RETURNING *`,
-      [
-        1, processedMovementDate, movement_type, freightCode, reference_number,
-        customs_agent, client_name, permit_number, driver_name, container_number,
-        processedUnloadingDate, processedDeliveryDate,
-        clearance_company, container_leak_status, container_leak_custom,
-        customs_permit_number, goods_description, container_size,
-        container_weight, shipping_line, bill_of_lading_number,
-        tractor_number, trailer_number, driver_phone,
-        delivery_location, loading_location,
-        warehouse_manager, warehouse_manager_phone, warehouse_working_hours,
-        process_type, notes || null
-      ]
-    );
-
-    res.status(201).json(result.rows[0]);
-  } catch (error) {
-    console.error('Error creating shipment:', error);
-    res.status(500).json({ error: 'Failed to create shipment' });
-  }
-});
-
-// UPDATE shipment by ID
-router.put('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const {
-      movement_date,
-      movement_type,
+      movement_type,       // Arabic (UI only)
+      process_type,        // 🔥 LOGIC TRUTH (export | import)
       freight_type,
       customs_agent,
       client_name,
@@ -210,8 +117,119 @@ router.put('/:id', async (req, res) => {
       notes
     } = req.body;
 
-    // Derive normalized process_type
-    const process_type = movement_type === 'تصدير' ? 'export' : 'import';
+    const normalizedProcessType =
+      process_type === 'export' ? 'export' : 'import';
+
+    const freightCode = freight_type?.toUpperCase() || 'TRK';
+    const movementCode = normalizedProcessType === 'export' ? 'EXP' : 'IMP';
+    const year = new Date().getFullYear();
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*) AS count
+       FROM shipments
+       WHERE freight_type = $1
+         AND process_type = $2
+         AND EXTRACT(YEAR FROM created_at) = $3`,
+      [freightCode, normalizedProcessType, year]
+    );
+
+    const sequence = String(Number(countResult.rows[0].count) + 1).padStart(4, '0');
+    const reference_number = `${freightCode}-${movementCode}-${year}-${sequence}`;
+
+    const result = await pool.query(
+      `INSERT INTO shipments (
+        user_id,
+        movement_date,
+        movement_type,
+        freight_type,
+        reference_number,
+        customs_agent,
+        client_name,
+        permit_number,
+        driver_name,
+        container_number,
+        unloading_date,
+        delivery_date,
+        clearance_company,
+        container_leak_status,
+        container_leak_custom,
+        customs_permit_number,
+        goods_description,
+        container_size,
+        container_weight,
+        shipping_line,
+        bill_of_lading_number,
+        tractor_number,
+        trailer_number,
+        driver_phone,
+        delivery_location,
+        loading_location,
+        warehouse_manager,
+        warehouse_manager_phone,
+        warehouse_working_hours,
+        process_type,
+        notes
+      ) VALUES (
+        1,
+        $1,$2,$3,$4,
+        $5,$6,$7,$8,$9,
+        $10,$11,
+        $12,$13,$14,
+        $15,$16,$17,
+        $18,$19,$20,
+        $21,$22,$23,
+        $24,$25,$26,
+        $27,$28,$29,
+        $30
+      )
+      RETURNING *`,
+      [
+        movement_date || null,
+        movement_type || null,
+        freightCode,
+        reference_number,
+        customs_agent,
+        client_name,
+        permit_number,
+        driver_name,
+        container_number,
+        unloading_date || null,
+        delivery_date || null,
+        clearance_company,
+        container_leak_status,
+        container_leak_custom,
+        customs_permit_number,
+        goods_description,
+        container_size,
+        container_weight,
+        shipping_line,
+        bill_of_lading_number,
+        tractor_number,
+        trailer_number,
+        driver_phone,
+        delivery_location,
+        loading_location,
+        warehouse_manager,
+        warehouse_manager_phone,
+        warehouse_working_hours,
+        normalizedProcessType,
+        notes || null
+      ]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Create shipment error:', error);
+    res.status(500).json({ error: 'Failed to create shipment' });
+  }
+});
+
+/* =========================================================
+   UPDATE
+   ========================================================= */
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
 
     const result = await pool.query(
       `UPDATE shipments SET
@@ -245,59 +263,73 @@ router.put('/:id', async (req, res) => {
         process_type = $28,
         notes = $29,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $30
-      RETURNING *`,
+       WHERE id = $30
+       RETURNING *`,
       [
-        movement_date || null,
-        movement_type,
-        freight_type ? String(freight_type).toUpperCase() : null,
-        customs_agent,
-        client_name,
-        permit_number,
-        driver_name,
-        container_number,
-        unloading_date || null,
-        delivery_date || null,
-        clearance_company,
-        container_leak_status,
-        container_leak_custom,
-        customs_permit_number,
-        goods_description,
-        container_size,
-        container_weight,
-        shipping_line,
-        bill_of_lading_number,
-        tractor_number,
-        trailer_number,
-        driver_phone,
-        delivery_location,
-        loading_location,
-        warehouse_manager,
-        warehouse_manager_phone,
-        warehouse_working_hours,
-        process_type,
-        notes || null,
+        req.body.movement_date || null,
+        req.body.movement_type || null,
+        req.body.freight_type?.toUpperCase() || null,
+        req.body.customs_agent,
+        req.body.client_name,
+        req.body.permit_number,
+        req.body.driver_name,
+        req.body.container_number,
+        req.body.unloading_date || null,
+        req.body.delivery_date || null,
+        req.body.clearance_company,
+        req.body.container_leak_status,
+        req.body.container_leak_custom,
+        req.body.customs_permit_number,
+        req.body.goods_description,
+        req.body.container_size,
+        req.body.container_weight,
+        req.body.shipping_line,
+        req.body.bill_of_lading_number,
+        req.body.tractor_number,
+        req.body.trailer_number,
+        req.body.driver_phone,
+        req.body.delivery_location,
+        req.body.loading_location,
+        req.body.warehouse_manager,
+        req.body.warehouse_manager_phone,
+        req.body.warehouse_working_hours,
+        req.body.process_type,
+        req.body.notes || null,
         id
       ]
     );
 
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Shipment not found' });
+    if (!result.rows.length) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('Error updating shipment:', error);
+    console.error('Update shipment error:', error);
     res.status(500).json({ error: 'Failed to update shipment' });
   }
 });
 
-// DELETE shipment by ID
+/* =========================================================
+   DELETE
+   ========================================================= */
 router.delete('/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    const result = await pool.query('DELETE FROM shipments WHERE id = $1 RETURNING *', [id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Shipment not found' });
-    res.json({ message: 'Shipment deleted successfully', deletedShipment: result.rows[0] });
+    const result = await pool.query(
+      'DELETE FROM shipments WHERE id = $1 RETURNING *',
+      [req.params.id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
+    res.json({
+      message: 'Shipment deleted successfully',
+      deletedShipment: result.rows[0]
+    });
   } catch (error) {
-    console.error('Error deleting shipment:', error);
+    console.error('Delete shipment error:', error);
     res.status(500).json({ error: 'Failed to delete shipment' });
   }
 });

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
+import { Fragment } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ShipmentFormData } from '../types/shipment';
 import AutoSuggestInput from '../components/AutoSuggestInput';
@@ -8,7 +9,6 @@ import AutoSuggestInput from '../components/AutoSuggestInput';
 // ============================================
 const initialFormData: ShipmentFormData = {
   movement_date: '',
-  movement_type: '',
   freight_type: 'TRK',
   client_name: '',
   driver_name: '',
@@ -68,8 +68,7 @@ const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({ currentSection, c
       {/* Progress Bar */}
       <div className="flex items-center justify-between mb-4">
         {SECTIONS.map((section, index) => (
-          <React.Fragment key={section.id}>
-            {/* Circle */}
+          <Fragment key={section.id}>
             <div className="flex flex-col items-center">
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold transition-all duration-300 ${completedSections.includes(section.id)
@@ -90,7 +89,7 @@ const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({ currentSection, c
                   }`}
               />
             )}
-          </React.Fragment>
+          </Fragment>
         ))}
       </div>
       {/* Progress Text */}
@@ -184,7 +183,6 @@ const EnhancedShipmentForm: React.FC = () => {
   const [activeSection, setActiveSection] = useState(1);
   const [completedSections, setCompletedSections] = useState<number[]>([]);
   const [dateError, setDateError] = useState('');
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ============================================
@@ -223,9 +221,6 @@ const EnhancedShipmentForm: React.FC = () => {
   // ============================================
   // VALIDATION HELPERSs
   // ============================================
-  const validateShippingLine = (value: string): boolean => /^[A-Z]{3}$/.test(value);
-  const validateContainerNumber = (value: string): boolean => /^[A-Z]{4}[0-9]{7}$/.test(value);
-  const validatePhoneNumber = (value: string): boolean => /^[0-9]{10}$/.test(value);
 
   // Check if section is complete
   const isSectionComplete = (sectionId: number): boolean => {
@@ -254,7 +249,7 @@ const EnhancedShipmentForm: React.FC = () => {
   const getSectionSummary = (sectionId: number): string => {
     switch (sectionId) {
       case 1:
-        return `${formData.movement_type} | ${formData.movement_date} | ${formData.freight_type}`;
+        return `${formData.process_type === 'import' ? 'استيراد' : 'تصدير'} | ${formData.movement_date} | ${formData.freight_type}`;
       case 2:
         return formData.client_name + (formData.clearance_company ? ` | ${formData.clearance_company}` : '');
       case 3:
@@ -357,6 +352,7 @@ const EnhancedShipmentForm: React.FC = () => {
     setIsSubmitting(true);
 
     const payload = buildPayload();
+    console.log('SUBMIT PAYLOAD:', payload);
 
     try {
       const response = await fetch(
