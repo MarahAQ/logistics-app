@@ -4,7 +4,7 @@ const router = express.Router();
 
 /* =========================================================
    AUTO-SUGGESTIONS
-   ========================================================= */
+========================================================= */
 router.get('/suggestions/search', async (req, res) => {
   try {
     const { field, query } = req.query;
@@ -46,7 +46,7 @@ router.get('/suggestions/search', async (req, res) => {
 
 /* =========================================================
    GET ALL
-   ========================================================= */
+========================================================= */
 router.get('/', async (req, res) => {
   try {
     const result = await pool.query(
@@ -61,7 +61,7 @@ router.get('/', async (req, res) => {
 
 /* =========================================================
    GET BY ID
-   ========================================================= */
+========================================================= */
 router.get('/:id', async (req, res) => {
   try {
     const result = await pool.query(
@@ -81,14 +81,14 @@ router.get('/:id', async (req, res) => {
 });
 
 /* =========================================================
-   CREATE (SINGLE SOURCE OF TRUTH)
-   ========================================================= */
+   CREATE
+========================================================= */
 router.post('/', async (req, res) => {
   try {
     const {
       movement_date,
-      movement_type,       // Arabic (UI only)
-      process_type,        // 🔥 LOGIC TRUTH (export | import)
+      movement_type,
+      process_type,
       freight_type,
       customs_agent,
       client_name,
@@ -124,17 +124,27 @@ router.post('/', async (req, res) => {
     const movementCode = normalizedProcessType === 'export' ? 'EXP' : 'IMP';
     const year = new Date().getFullYear();
 
-    const countResult = await pool.query(
-      `SELECT COUNT(*) AS count
-       FROM shipments
-       WHERE freight_type = $1
-         AND process_type = $2
-         AND EXTRACT(YEAR FROM created_at) = $3`,
-      [freightCode, normalizedProcessType, year]
+    const maxResult = await pool.query(
+      `
+      SELECT MAX(
+        CAST(SPLIT_PART(reference_number, '-', 4) AS INTEGER)
+      ) AS max_seq
+      FROM shipments
+      WHERE freight_type = $1
+        AND process_type = $2
+        AND reference_number LIKE $3
+      `,
+      [
+        freightCode,
+        normalizedProcessType,
+        `${freightCode}-${movementCode}-${year}-%`
+      ]
     );
 
-    const sequence = String(Number(countResult.rows[0].count) + 1).padStart(4, '0');
-    const reference_number = `${freightCode}-${movementCode}-${year}-${sequence}`;
+    const nextSequence = (Number(maxResult.rows[0].max_seq) || 0) + 1;
+    const sequence = String(nextSequence).padStart(4, '0');
+    const reference_number =
+      `${freightCode}-${movementCode}-${year}-${sequence}`;
 
     const result = await pool.query(
       `INSERT INTO shipments (
@@ -169,7 +179,8 @@ router.post('/', async (req, res) => {
         warehouse_working_hours,
         process_type,
         notes
-      ) VALUES (
+      )
+      VALUES (
         1,
         $1,$2,$3,$4,
         $5,$6,$7,$8,$9,
@@ -225,11 +236,30 @@ router.post('/', async (req, res) => {
 });
 
 /* =========================================================
-   UPDATE
-   ========================================================= */
+   UPDATE (process_type locked)
+========================================================= */
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+
+    // 🔒 Prevent process_type modification
+    const existing = await pool.query(
+      'SELECT process_type FROM shipments WHERE id = $1',
+      [id]
+    );
+
+    if (!existing.rows.length) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
+    if (
+      req.body.process_type &&
+      req.body.process_type !== existing.rows[0].process_type
+    ) {
+      return res.status(400).json({
+        error: 'Changing process_type is not allowed'
+      });
+    }
 
     const result = await pool.query(
       `UPDATE shipments SET
@@ -260,11 +290,10 @@ router.put('/:id', async (req, res) => {
         warehouse_manager = $25,
         warehouse_manager_phone = $26,
         warehouse_working_hours = $27,
-        process_type = $28,
-        notes = $29,
+        notes = $28,
         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $30
-       RETURNING *`,
+      WHERE id = $29
+      RETURNING *`,
       [
         req.body.movement_date || null,
         req.body.movement_type || null,
@@ -293,15 +322,10 @@ router.put('/:id', async (req, res) => {
         req.body.warehouse_manager,
         req.body.warehouse_manager_phone,
         req.body.warehouse_working_hours,
-        req.body.process_type,
         req.body.notes || null,
         id
       ]
     );
-
-    if (!result.rows.length) {
-      return res.status(404).json({ error: 'Shipment not found' });
-    }
 
     res.json(result.rows[0]);
   } catch (error) {
@@ -312,7 +336,7 @@ router.put('/:id', async (req, res) => {
 
 /* =========================================================
    DELETE
-   ========================================================= */
+========================================================= */
 router.delete('/:id', async (req, res) => {
   try {
     const result = await pool.query(

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Shipment } from '../types/shipment';
 import ShipmentViewModal from '../components/ShipmentViewModal';
 import ShipmentPrintView from '../components/ShipmentPrintView';
@@ -44,6 +44,8 @@ const setStatusMap = (map: Record<string, ShipmentStatus>) => {
 // DASHBOARD COMPONENT
 // ============================================
 const Dashboard: React.FC = () => {
+  const location = useLocation();
+
   // Data State
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,14 +58,18 @@ const Dashboard: React.FC = () => {
   // Menu state
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const menuRef = useRef<HTMLTableCellElement | null>(null);
+
   // Status map
   const [statusMapState, setStatusMapState] = useState<Record<string, ShipmentStatus>>(() => getStatusMap());
 
   // View Modal state
   const [viewingShipment, setViewingShipment] = useState<Shipment | null>(null);
 
-  // 🆕 Print View state
+  // Print View state
   const [printingShipment, setPrintingShipment] = useState<Shipment | null>(null);
+
+  // Highlight edited row
+  const [highlightedId, setHighlightedId] = useState<number | null>(null);
 
   // ============================================
   // FETCH DATA
@@ -85,6 +91,25 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     fetchShipments();
   }, []);
+
+  // Handle highlight from navigation state (after edit)
+  useEffect(() => {
+    const state = location.state as { editedId?: number; refresh?: boolean } | null;
+    if (state?.editedId) {
+      setHighlightedId(state.editedId);
+      // Remove highlight after 5 seconds
+      const timer = setTimeout(() => {
+        setHighlightedId(null);
+      }, 5000);
+      // Clear location state
+      window.history.replaceState({}, document.title);
+      return () => clearTimeout(timer);
+    }
+    if (state?.refresh) {
+      fetchShipments();
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   // Close menu on outside click
   useEffect(() => {
@@ -113,28 +138,24 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // Open view modal
   const handleRowClick = (shipment: Shipment) => {
     setViewingShipment(shipment);
   };
 
-  // View from menu
   const handleViewFromMenu = (shipment: Shipment) => {
     setOpenMenuId(null);
     setViewingShipment(shipment);
   };
 
-  // 🆕 Print from menu
   const handlePrintFromMenu = (shipment: Shipment) => {
     setOpenMenuId(null);
     setPrintingShipment(shipment);
   };
 
-  // 🆕 Print from view modal
   const handlePrintFromModal = () => {
     if (viewingShipment) {
-      setViewingShipment(null); // Close view modal
-      setPrintingShipment(viewingShipment); // Open print view
+      setViewingShipment(null);
+      setPrintingShipment(viewingShipment);
     }
   };
 
@@ -158,12 +179,7 @@ const Dashboard: React.FC = () => {
       if (filterProcess !== 'all' && s.process_type !== filterProcess) return false;
 
       if (search.trim()) {
-        const haystack = [
-          s.reference_number,
-          s.permit_number,
-          s.client_name,
-          s.container_number,
-        ]
+        const haystack = [s.reference_number, s.permit_number, s.client_name, s.container_number]
           .map(normalized)
           .join(' ');
         if (!haystack.includes(normalized(search))) return false;
@@ -173,7 +189,10 @@ const Dashboard: React.FC = () => {
     });
   }, [shipments, filterProcess, search]);
 
-  const visibleShipments = useMemo(() => filteredShipments.slice(0, visibleCount), [filteredShipments, visibleCount]);
+  const visibleShipments = useMemo(
+    () => filteredShipments.slice(0, visibleCount),
+    [filteredShipments, visibleCount]
+  );
 
   // Stats
   const importCount = shipments.filter((s) => s.process_type === 'import').length;
@@ -214,7 +233,12 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="w-12 h-12 bg-sky-50 rounded-xl flex items-center justify-center">
               <svg className="w-6 h-6 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                />
               </svg>
             </div>
           </div>
@@ -255,8 +279,18 @@ const Dashboard: React.FC = () => {
           {/* Search */}
           <div className="flex-1">
             <div className="relative">
-              <svg className="w-5 h-5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <svg
+                className="w-5 h-5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
               </svg>
               <input
                 value={search}
@@ -285,9 +319,7 @@ const Dashboard: React.FC = () => {
           </select>
 
           {/* Results count */}
-          <div className="flex items-center text-sm text-gray-500">
-            النتائج: {filteredShipments.length}
-          </div>
+          <div className="flex items-center text-sm text-gray-500">النتائج: {filteredShipments.length}</div>
         </div>
       </div>
 
@@ -312,11 +344,16 @@ const Dashboard: React.FC = () => {
               {visibleShipments.map((shipment) => {
                 const statusValue = getShipmentStatus(shipment.id);
                 const statusOption = STATUS_OPTIONS.find((s) => s.value === statusValue) || STATUS_OPTIONS[0];
+                const isHighlighted = highlightedId === shipment.id;
 
                 return (
                   <tr
                     key={shipment.id}
-                    className="hover:bg-sky-50/50 transition-colors cursor-pointer"
+                    className={`transition-all duration-500 cursor-pointer ${
+                      isHighlighted
+                        ? 'bg-green-100 animate-pulse'
+                        : 'hover:bg-sky-50/50'
+                    }`}
                     onClick={() => handleRowClick(shipment)}
                   >
                     <td className="px-4 py-3 text-sm font-medium text-gray-700">
@@ -324,15 +361,18 @@ const Dashboard: React.FC = () => {
                     </td>
 
                     <td className="px-4 py-3 text-sm">
-                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${shipment.process_type === 'import'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-orange-100 text-orange-700'
-                        }`}>
+                      <span
+                        className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${
+                          shipment.process_type === 'import'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-orange-100 text-orange-700'
+                        }`}
+                      >
                         {shipment.process_type === 'import' ? 'استيراد' : 'تصدير'}
                       </span>
                     </td>
 
-                    {/* Status dropdown - stop propagation */}
+                    {/* Status dropdown */}
                     <td className="px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
                       <select
                         value={statusValue}
@@ -340,14 +380,14 @@ const Dashboard: React.FC = () => {
                         className={`px-2 py-1 rounded-lg text-xs font-medium border-0 cursor-pointer ${statusOption.color}`}
                       >
                         {STATUS_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
                         ))}
                       </select>
                     </td>
 
-                    <td className="px-4 py-3 text-sm text-gray-700">
-                      {shipment.client_name || '-'}
-                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{shipment.client_name || '-'}</td>
 
                     <td className="px-4 py-3 text-sm font-semibold text-gray-700">
                       {shipment.container_weight ?? '-'}
@@ -365,7 +405,7 @@ const Dashboard: React.FC = () => {
                         : formatDate(shipment.movement_date)}
                     </td>
 
-                    {/* Actions Menu - stop propagation */}
+                    {/* Actions Menu */}
                     <td
                       className="px-4 py-3 text-sm relative"
                       ref={openMenuId === shipment.id ? menuRef : null}
@@ -382,21 +422,18 @@ const Dashboard: React.FC = () => {
 
                       {openMenuId === shipment.id && (
                         <div className="absolute left-0 mt-1 w-36 bg-white rounded-xl shadow-lg border border-gray-100 z-20 overflow-hidden">
-                          {/* View Option */}
                           <button
                             onClick={() => handleViewFromMenu(shipment)}
                             className="w-full text-right px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                           >
                             👁️ عرض
                           </button>
-                          {/* 🆕 Print Option */}
                           <button
                             onClick={() => handlePrintFromMenu(shipment)}
                             className="w-full text-right px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                           >
                             🖨️ طباعة
                           </button>
-                          {/* Edit Option */}
                           <Link
                             to={`/shipments/edit/${shipment.id}`}
                             className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
@@ -404,7 +441,6 @@ const Dashboard: React.FC = () => {
                           >
                             ✏️ تعديل
                           </Link>
-                          {/* Delete Option */}
                           <button
                             onClick={() => handleDelete(shipment.id)}
                             className="w-full text-right px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
@@ -451,12 +487,9 @@ const Dashboard: React.FC = () => {
         />
       )}
 
-      {/* 🆕 Print View */}
+      {/* Print View */}
       {printingShipment && (
-        <ShipmentPrintView
-          shipment={printingShipment}
-          onClose={() => setPrintingShipment(null)}
-        />
+        <ShipmentPrintView shipment={printingShipment} onClose={() => setPrintingShipment(null)} />
       )}
     </div>
   );

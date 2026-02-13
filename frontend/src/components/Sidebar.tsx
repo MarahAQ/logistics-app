@@ -80,6 +80,7 @@ const ROLE_COLORS: Record<string, string> = {
 const Sidebar: React.FC = () => {
   const { user, logout } = useAuth();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [logoError, setLogoError] = useState(false);
 
   // Get user info from context
   const userName = user?.name || 'مستخدم';
@@ -109,22 +110,40 @@ const Sidebar: React.FC = () => {
   );
 
   // ============================================
+  // LOGO COMPONENT (with fallback)
+  // ============================================
+  const LogoSection = () => (
+    <div className="p-5 border-b border-gray-100">
+      <div className="flex items-center gap-3">
+        {!logoError ? (
+          <img 
+            src="/jericho-logo.png" 
+            alt="Jericho Transport" 
+            className="h-10 object-contain"
+            onError={() => setLogoError(true)}
+          />
+        ) : (
+          <>
+            <div className="w-11 h-11 bg-black rounded-xl flex items-center justify-center shadow-sm">
+              <span className="text-white font-bold text-lg tracking-tight">jt</span>
+            </div>
+            <div className="text-right">
+              <h1 className="font-bold text-gray-800 text-sm leading-tight">Jericho Transport</h1>
+              <p className="text-xs text-gray-400 mt-0.5">شركة أريحا للنقل</p>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+
+  // ============================================
   // SIDEBAR CONTENT
   // ============================================
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-white">
       {/* Logo Section */}
-      <div className="p-5 border-b border-gray-100">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 bg-black rounded-xl flex items-center justify-center shadow-sm">
-            <span className="text-white font-bold text-lg tracking-tight">jt</span>
-          </div>
-          <div className="text-right">
-            <h1 className="font-bold text-gray-800 text-sm leading-tight">Jericho Transport</h1>
-            <p className="text-xs text-gray-400 mt-0.5">شركة أريحا للنقل</p>
-          </div>
-        </div>
-      </div>
+      <LogoSection />
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">

@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 const API_BASE = 'http://localhost:5001';
 
 // ============================================
-// LOGIN PAGE
+// LOGIN PAGE - Production Ready
 // ============================================
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -85,10 +85,23 @@ const Login: React.FC = () => {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-black rounded-2xl shadow-lg mb-4">
+          <img 
+            src="/jericho-logo.png" 
+            alt="Jericho Transport" 
+            className="h-16 mx-auto mb-4"
+            onError={(e) => {
+              // Fallback if image doesn't load
+              e.currentTarget.style.display = 'none';
+              const fallback = document.getElementById('logo-fallback');
+              if (fallback) fallback.style.display = 'flex';
+            }}
+          />
+          <div 
+            id="logo-fallback" 
+            className="hidden items-center justify-center w-20 h-20 bg-black rounded-2xl shadow-lg mb-4 mx-auto"
+          >
             <span className="text-white font-bold text-3xl">jt</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">Jericho Transport</h1>
           <p className="text-gray-500 mt-1">شركة أريحا للنقل</p>
         </div>
 
@@ -117,7 +130,7 @@ const Login: React.FC = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="example@jericho.com"
+                placeholder="name@jericho.com"
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all text-left"
                 dir="ltr"
                 disabled={isSubmitting}
@@ -164,29 +177,6 @@ const Login: React.FC = () => {
               )}
             </button>
           </form>
-
-          {/* Demo Credentials */}
-          <div className="mt-6 pt-6 border-t border-gray-100">
-            <p className="text-xs text-gray-400 text-center mb-3">بيانات تجريبية للدخول:</p>
-            <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-600 space-y-1">
-              <div className="flex justify-between">
-                <span>مدير:</span>
-                <span className="text-left font-mono" dir="ltr">Hammoudeh@jericho.com</span>
-              </div>
-              <div className="flex justify-between">
-                <span>مشغل:</span>
-                <span className="text-left font-mono" dir="ltr">operator@jericho.com</span>
-              </div>
-              <div className="flex justify-between">
-                <span>محاسب:</span>
-                <span className="text-left font-mono" dir="ltr">accountant@jericho.com</span>
-              </div>
-              <div className="flex justify-between border-t border-gray-200 pt-1 mt-1">
-                <span>كلمة المرور:</span>
-                <span className="font-mono font-bold">123456</span>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Footer */}
