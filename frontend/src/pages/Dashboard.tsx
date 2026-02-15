@@ -349,11 +349,10 @@ const Dashboard: React.FC = () => {
                 return (
                   <tr
                     key={shipment.id}
-                    className={`transition-all duration-500 cursor-pointer ${
-                      isHighlighted
+                    className={`transition-all duration-500 cursor-pointer ${isHighlighted
                         ? 'bg-green-100 animate-pulse'
                         : 'hover:bg-sky-50/50'
-                    }`}
+                      }`}
                     onClick={() => handleRowClick(shipment)}
                   >
                     <td className="px-4 py-3 text-sm font-medium text-gray-700">
@@ -362,11 +361,10 @@ const Dashboard: React.FC = () => {
 
                     <td className="px-4 py-3 text-sm">
                       <span
-                        className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${
-                          shipment.process_type === 'import'
+                        className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${shipment.process_type === 'import'
                             ? 'bg-green-100 text-green-700'
                             : 'bg-orange-100 text-orange-700'
-                        }`}
+                          }`}
                       >
                         {shipment.process_type === 'import' ? 'استيراد' : 'تصدير'}
                       </span>
@@ -421,7 +419,7 @@ const Dashboard: React.FC = () => {
                       </button>
 
                       {openMenuId === shipment.id && (
-                        <div className="absolute left-0 mt-1 w-36 bg-white rounded-xl shadow-lg border border-gray-100 z-20 overflow-hidden">
+                        <div className="absolute left-0 bottom-full mb-1 w-36 bg-white rounded-xl shadow-lg border border-gray-100 z-50 overflow-hidden">
                           <button
                             onClick={() => handleViewFromMenu(shipment)}
                             className="w-full text-right px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
