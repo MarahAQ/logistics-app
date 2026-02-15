@@ -57,7 +57,9 @@ const Dashboard: React.FC = () => {
 
   // Menu state
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
-  const menuRef = useRef<HTMLTableCellElement | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const buttonRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
 
   // Status map
   const [statusMapState, setStatusMapState] = useState<Record<string, ShipmentStatus>>(() => getStatusMap());
@@ -115,11 +117,29 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
       if (openMenuId !== null && menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        // Check if click was on a menu button
+        const clickedButton = buttonRefs.current.get(openMenuId);
+        if (clickedButton && clickedButton.contains(e.target as Node)) {
+          return;
+        }
         setOpenMenuId(null);
+        setMenuPosition(null);
       }
     };
     document.addEventListener('mousedown', onClick);
     return () => document.removeEventListener('mousedown', onClick);
+  }, [openMenuId]);
+
+  // Close menu on scroll
+  useEffect(() => {
+    const onScroll = () => {
+      if (openMenuId !== null) {
+        setOpenMenuId(null);
+        setMenuPosition(null);
+      }
+    };
+    window.addEventListener('scroll', onScroll, true);
+    return () => window.removeEventListener('scroll', onScroll, true);
   }, [openMenuId]);
 
   // ============================================
@@ -131,6 +151,7 @@ const Dashboard: React.FC = () => {
       const response = await fetch(`${API_BASE}/api/shipments/${id}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Failed to delete');
       setOpenMenuId(null);
+      setMenuPosition(null);
       fetchShipments();
     } catch (error) {
       console.error('Error:', error);
@@ -144,11 +165,13 @@ const Dashboard: React.FC = () => {
 
   const handleViewFromMenu = (shipment: Shipment) => {
     setOpenMenuId(null);
+    setMenuPosition(null);
     setViewingShipment(shipment);
   };
 
   const handlePrintFromMenu = (shipment: Shipment) => {
     setOpenMenuId(null);
+    setMenuPosition(null);
     setPrintingShipment(shipment);
   };
 
@@ -167,6 +190,20 @@ const Dashboard: React.FC = () => {
     const next = { ...statusMapState, [String(shipmentId)]: status };
     setStatusMapState(next);
     setStatusMap(next);
+  };
+
+  const handleMenuToggle = (shipmentId: number, buttonElement: HTMLButtonElement) => {
+    if (openMenuId === shipmentId) {
+      setOpenMenuId(null);
+      setMenuPosition(null);
+    } else {
+      const rect = buttonElement.getBoundingClientRect();
+      setMenuPosition({
+        top: rect.bottom + 8,
+        left: rect.left - 100, // Offset to align menu properly
+      });
+      setOpenMenuId(shipmentId);
+    }
   };
 
   // ============================================
@@ -197,6 +234,9 @@ const Dashboard: React.FC = () => {
   // Stats
   const importCount = shipments.filter((s) => s.process_type === 'import').length;
   const exportCount = shipments.filter((s) => s.process_type === 'export').length;
+
+  // Get the currently selected shipment for menu
+  const menuShipment = openMenuId ? shipments.find(s => s.id === openMenuId) : null;
 
   // ============================================
   // LOADING STATE
@@ -403,50 +443,22 @@ const Dashboard: React.FC = () => {
                         : formatDate(shipment.movement_date)}
                     </td>
 
-                    {/* Actions Menu */}
+                    {/* Actions Menu Button */}
                     <td
-                      className="px-4 py-3 text-sm relative"
-                      ref={openMenuId === shipment.id ? menuRef : null}
+                      className="px-4 py-3 text-sm"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
-                        onClick={() => setOpenMenuId(openMenuId === shipment.id ? null : shipment.id)}
+                        ref={(el) => {
+                          if (el) buttonRefs.current.set(shipment.id, el);
+                        }}
+                        onClick={(e) => handleMenuToggle(shipment.id, e.currentTarget)}
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                       >
                         <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
                         </svg>
                       </button>
-
-                      {openMenuId === shipment.id && (
-                        <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-lg border border-gray-100 z-50">
-                          <button
-                            onClick={() => handleViewFromMenu(shipment)}
-                            className="w-full text-right px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                          >
-                            👁️ عرض
-                          </button>
-                          <button
-                            onClick={() => handlePrintFromMenu(shipment)}
-                            className="w-full text-right px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                          >
-                            🖨️ طباعة
-                          </button>
-                          <Link
-                            to={`/shipments/edit/${shipment.id}`}
-                            className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                            onClick={() => setOpenMenuId(null)}
-                          >
-                            ✏️ تعديل
-                          </Link>
-                          <button
-                            onClick={() => handleDelete(shipment.id)}
-                            className="w-full text-right px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                          >
-                            🗑️ حذف
-                          </button>
-                        </div>
-                      )}
                     </td>
                   </tr>
                 );
@@ -475,6 +487,51 @@ const Dashboard: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Fixed Position Dropdown Menu */}
+      {openMenuId !== null && menuShipment && menuPosition && (
+        <div
+          ref={menuRef}
+          className="fixed w-40 bg-white rounded-xl shadow-2xl border border-gray-200 z-[9999] py-1"
+          style={{
+            top: menuPosition.top,
+            left: menuPosition.left,
+          }}
+        >
+          <button
+            onClick={() => handleViewFromMenu(menuShipment)}
+            className="w-full text-right px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+          >
+            <span>👁️</span>
+            <span>عرض</span>
+          </button>
+          <button
+            onClick={() => handlePrintFromMenu(menuShipment)}
+            className="w-full text-right px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+          >
+            <span>🖨️</span>
+            <span>طباعة</span>
+          </button>
+          <Link
+            to={`/shipments/edit/${menuShipment.id}`}
+            className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+            onClick={() => {
+              setOpenMenuId(null);
+              setMenuPosition(null);
+            }}
+          >
+            <span>✏️</span>
+            <span>تعديل</span>
+          </Link>
+          <button
+            onClick={() => handleDelete(menuShipment.id)}
+            className="w-full text-right px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+          >
+            <span>🗑️</span>
+            <span>حذف</span>
+          </button>
+        </div>
+      )}
 
       {/* View Modal */}
       {viewingShipment && (
