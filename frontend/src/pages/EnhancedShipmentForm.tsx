@@ -2,6 +2,7 @@ import { useState, useEffect, Fragment } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ShipmentFormData } from '../types/shipment';
 import AutoSuggestInput from '../components/AutoSuggestInput';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
 // ============================================
 // INITIAL FORM DATA
@@ -228,7 +229,7 @@ const EnhancedShipmentForm: React.FC = () => {
 
     const fetchShipment = async () => {
       try {
-        const response = await fetch(`http://localhost:5001/api/shipments/${id}`);
+        const response = await fetch(`${API_BASE}/api/shipments/${id}`);
         if (!response.ok) throw new Error('Failed to load shipment');
         const data = await response.json();
 
@@ -425,7 +426,7 @@ const EnhancedShipmentForm: React.FC = () => {
 
     try {
       const response = await fetch(
-        id ? `http://localhost:5001/api/shipments/${id}` : 'http://localhost:5001/api/shipments',
+        id ? `${API_BASE}/api/shipments/${id}` : `${API_BASE}/api/shipments`,
         {
           method: id ? 'PUT' : 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1066,6 +1067,6 @@ const EnhancedShipmentForm: React.FC = () => {
       </div>
     </div>
   );
-};
+};o
 
 export default EnhancedShipmentForm;
