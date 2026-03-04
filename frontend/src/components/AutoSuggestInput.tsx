@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+
 interface AutoSuggestInputProps {
   field: string;
   value: string;
@@ -20,6 +22,7 @@ const AutoSuggestInput: React.FC<AutoSuggestInputProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const timeoutRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (value && value.length > 1) {
       if (timeoutRef.current) {
@@ -45,7 +48,7 @@ const AutoSuggestInput: React.FC<AutoSuggestInputProps> = ({
 
     setIsLoading(true);
     try {
-      const response = await axios.get(`http://localhost:5001/api/shipments/suggestions/search`, {
+      const response = await axios.get(`${API_BASE}/api/shipments/suggestions/search`, {
         params: { field, query }
       });
       setSuggestions(response.data);
